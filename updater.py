@@ -1,12 +1,11 @@
 import os
-import sys
-import gitlab
 import json
-import hashlib
-import logging
-from datetime import datetime
 import time
 import shutil
+import requests
+from datetime import datetime
+import logging
+import sys
 
 # Configuration du logging
 logging.basicConfig(
@@ -20,123 +19,78 @@ logging.basicConfig(
 
 class AutoUpdater:
     def __init__(self):
-        self.config_file = 'config.json'
-        self.load_config()
-        self.gl = gitlab.Gitlab(
-            url=self.config['gitlab_url'],
-            private_token=self.config['gitlab_token']
-        )
-        self.project = self.gl.projects.get(self.config['project_id'])
-        self.current_version_file = 'current_version.json'
+        self.config = self._load_config()
+        self.github_repo = self.config['github_repo']
+        self.api_url = f"https://api.github.com/repos/{self.github_repo}"
+        self.headers = {
+            'Authorization': f"token {self.config.get('github_token')}",
+            'Accept': 'application/vnd.github.v3+json'
+        }
 
-    def load_config(self):
+    def _load_config(self):
         try:
-            with open(self.config_file, 'r') as f:
-                self.config = json.load(f)
+            with open('config.json', 'r') as f:
+                return json.load(f)
         except FileNotFoundError:
             logging.error("Fichier de configuration non trouvé")
             sys.exit(1)
 
-    def get_current_version(self):
-        try:
-            with open(self.current_version_file, 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            return {"commit_id": None}
-
-    def save_current_version(self, commit_id):
-        with open(self.current_version_file, 'w') as f:
-            json.dump({"commit_id": commit_id}, f)
-
-    def backup_current_version(self):
-        backup_dir = "backups"
-        if not os.path.exists(backup_dir):
-            os.makedirs(backup_dir)
-        
+    def _create_backup(self):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = os.path.join(backup_dir, f"backup_{timestamp}")
-        
-        # Liste des fichiers à exclure de la sauvegarde
-        exclude = {
-            'venv', 'backups', '__pycache__', 
-            'updater.log', 'config.json', 
-            'current_version.json'
-        }
-        
-        os.makedirs(backup_path)
-        for item in os.listdir('.'):
-            if item not in exclude and not item.startswith('.'):
-                src = os.path.join('.', item)
-                dst = os.path.join(backup_path, item)
-                if os.path.isdir(src):
-                    shutil.copytree(src, dst)
-                else:
-                    shutil.copy2(src, dst)
-        
-        return backup_path
+        backup_dir = f"backup_{timestamp}"
+        shutil.copytree('.', backup_dir, ignore=shutil.ignore_patterns('backup_*', '__pycache__', '*.pyc'))
+        return backup_dir
+
+    def _get_latest_commit(self):
+        response = requests.get(f"{self.api_url}/commits/main", headers=self.headers)
+        if response.status_code == 200:
+            return response.json()['sha']
+        return None
+
+    def _download_latest_code(self):
+        response = requests.get(f"{self.api_url}/zipball/main", headers=self.headers)
+        if response.status_code == 200:
+            with open('update.zip', 'wb') as f:
+                f.write(response.content)
+            return True
+        return False
 
     def check_for_updates(self):
         try:
-            current_version = self.get_current_version()
-            latest_commit = self.project.commits.list()[0]
-            
-            if current_version["commit_id"] != latest_commit.id:
-                logging.info(f"Nouvelle version disponible: {latest_commit.id}")
-                return latest_commit
-            return None
+            latest_commit = self._get_latest_commit()
+            if not latest_commit:
+                logging.error("Impossible de vérifier les mises à jour")
+                return
+
+            last_update_file = 'last_update.txt'
+            current_commit = None
+            if os.path.exists(last_update_file):
+                with open(last_update_file, 'r') as f:
+                    current_commit = f.read().strip()
+
+            if current_commit != latest_commit:
+                logging.info("Nouvelle mise à jour disponible!")
+                backup_dir = self._create_backup()
+                logging.info(f"Backup créé dans: {backup_dir}")
+
+                if self._download_latest_code():
+                    logging.info("Code mis à jour avec succès")
+                    with open(last_update_file, 'w') as f:
+                        f.write(latest_commit)
+                else:
+                    logging.error("Échec de la mise à jour")
+            else:
+                logging.info("Le code est à jour")
+
         except Exception as e:
             logging.error(f"Erreur lors de la vérification des mises à jour: {str(e)}")
-            return None
 
-    def download_and_apply_update(self, commit):
-        try:
-            # Sauvegarde de la version actuelle
-            backup_path = self.backup_current_version()
-            logging.info(f"Sauvegarde créée dans: {backup_path}")
-
-            # Téléchargement des fichiers
-            items = self.project.repository_tree(recursive=True)
-            for item in items:
-                if item['type'] == 'blob':
-                    file_path = item['path']
-                    # Exclusion des fichiers de configuration et des dossiers spéciaux
-                    if not any(excluded in file_path for excluded in ['venv/', 'config.json', '__pycache__']):
-                        file_content = self.project.files.get(
-                            file_path=file_path, 
-                            ref=commit.id
-                        ).decode()
-                        
-                        # Création des dossiers si nécessaire
-                        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                        
-                        with open(file_path, 'wb') as f:
-                            f.write(file_content)
-                        
-                        logging.info(f"Fichier mis à jour: {file_path}")
-
-            # Mise à jour de la version actuelle
-            self.save_current_version(commit.id)
-            logging.info("Mise à jour terminée avec succès")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Erreur lors de la mise à jour: {str(e)}")
-            return False
-
-    def run(self):
+    def start(self):
         while True:
-            logging.info("Vérification des mises à jour...")
-            update = self.check_for_updates()
-            
-            if update:
-                logging.info("Installation de la mise à jour...")
-                if self.download_and_apply_update(update):
-                    logging.info("Redémarrage de l'application...")
-                    os.execv(sys.executable, ['python'] + sys.argv)
-            
-            # Attente avant la prochaine vérification
+            logging.info("\nVérification des mises à jour...")
+            self.check_for_updates()
             time.sleep(self.config['check_interval'])
 
 if __name__ == "__main__":
     updater = AutoUpdater()
-    updater.run()
+    updater.start()
