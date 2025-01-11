@@ -83,7 +83,7 @@ class WANManager {
                                 </div>
                             </div>
                             <div class="mt-3">
-                                <a href="/wans/${wan.client_id}" class="btn btn-primary">
+                                <a href="/wan/${wan.client_id}" class="btn btn-primary">
                                     <i class="fas fa-desktop"></i> Voir les appareils
                                 </a>
                                 <button class="btn btn-danger delete-wan" data-wan-id="${wan.client_id}">
