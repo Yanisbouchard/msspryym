@@ -49,10 +49,9 @@ def init_db():
                 subnet TEXT,
                 location TEXT,
                 status TEXT DEFAULT 'offline',
-                last_seen TIMESTAMP,
-                latency REAL
+                last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
             );
-
+            
             CREATE TABLE IF NOT EXISTS devices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 wan_id TEXT,
@@ -60,9 +59,9 @@ def init_db():
                 hostname TEXT,
                 mac TEXT,
                 vendor TEXT,
-                status TEXT DEFAULT 'down',
-                last_seen TIMESTAMP,
-                FOREIGN KEY (wan_id) REFERENCES wans(client_id)
+                status TEXT,
+                last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (wan_id) REFERENCES wans (client_id)
             );
         ''')
 
@@ -70,68 +69,55 @@ def init_db():
 @app.route('/')
 def index():
     """Page d'accueil"""
-    try:
-        server_ip = request.host.split(':')[0]
-        return render_template('index.html', server_ip=server_ip)
-    except Exception as e:
-        logger.error(f"Erreur lors du chargement de l'index: {str(e)}")
-        return render_template('error.html', message='Erreur serveur')
+    with get_db() as db:
+        wans = db.execute('SELECT * FROM wans').fetchall()
+        return render_template('index.html', wans=wans)
 
 @app.route('/changelog')
 def changelog():
     """Affiche les notes de version"""
-    try:
-        changelog_path = os.path.join(os.path.dirname(__file__), 'changelog.json')
-        if not os.path.exists(changelog_path):
-            return render_template('error.html', message='Notes de version introuvables')
-        
-        with open(changelog_path, 'r', encoding='utf-8') as f:
-            changelog = json.load(f)
-        return render_template('changelog.html', changelog=changelog, version=VERSION)
-    except Exception as e:
-        logger.error(f"Erreur lors de la lecture du changelog: {str(e)}")
-        return render_template('error.html', message='Erreur lors de la lecture des notes de version')
+    changes = [
+        {
+            'version': '3.1.1',
+            'date': '2024-01-11',
+            'changes': [
+                'Amélioration de la gestion du statut online/offline',
+                'Ajout du ping client toutes les secondes',
+                'Correction de bugs mineurs'
+            ]
+        }
+    ]
+    return render_template('changelog.html', changes=changes)
 
 @app.route('/wan/<client_id>')
 def wan_devices(client_id):
     """Affiche les appareils d'un WAN"""
-    try:
-        with get_db() as db:
-            cursor = db.execute('SELECT * FROM wans WHERE client_id = ?', (client_id,))
-            wan = cursor.fetchone()
-            if not wan:
-                return render_template('error.html', message='WAN non trouvé')
+    with get_db() as db:
+        wan = db.execute('SELECT * FROM wans WHERE client_id = ?', (client_id,)).fetchone()
+        if not wan:
+            return "WAN non trouvé", 404
             
-            cursor = db.execute('SELECT * FROM devices WHERE wan_id = ?', (client_id,))
-            devices = cursor.fetchall()
-            
-            return render_template('devices.html', wan=dict(wan), devices=[dict(d) for d in devices])
-    except Exception as e:
-        logger.error(f"Erreur lors de l'affichage des appareils: {str(e)}")
-        return render_template('error.html', message='Erreur lors de la récupération des appareils')
+        devices = db.execute('SELECT * FROM devices WHERE wan_id = ?', (client_id,)).fetchall()
+        return render_template('devices.html', wan=wan, devices=devices)
 
 # Routes API
-@app.route('/api/wans', methods=['GET'])
+@app.route('/api/wans')
 def get_wans():
     """Récupère la liste des WANs"""
     try:
         with get_db() as db:
-            cursor = db.execute('''
-                SELECT client_id, name, location, ip, subnet, status, last_seen, latency
-                FROM wans ORDER BY name
-            ''')
-            return jsonify([dict(row) for row in cursor.fetchall()])
+            wans = db.execute('SELECT * FROM wans').fetchall()
+            return jsonify([dict(wan) for wan in wans])
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des WANs: {str(e)}")
         return jsonify({'error': 'Erreur serveur'}), 500
 
-@app.route('/api/wans/<client_id>', methods=['GET'])
+@app.route('/api/wans/<client_id>')
 def get_wan(client_id):
     """Récupère les détails d'un WAN"""
     try:
         with get_db() as db:
-            cursor = db.execute('SELECT * FROM wans WHERE client_id = ?', (client_id,))
-            wan = cursor.fetchone()
+            wan = db.execute('SELECT * FROM wans WHERE client_id = ?', (client_id,)).fetchone()
             if not wan:
                 return jsonify({'error': 'WAN non trouvé'}), 404
             return jsonify(dict(wan))
@@ -163,6 +149,7 @@ def register_wan():
             return jsonify({'error': 'Données manquantes'}), 400
             
         with get_db() as db:
+            # Mise à jour du WAN avec le nouveau timestamp
             db.execute('''
                 INSERT OR REPLACE INTO wans 
                 (client_id, name, ip, subnet, location, status, last_seen)
@@ -185,7 +172,7 @@ def update_devices():
             return jsonify({'error': 'Données manquantes'}), 400
             
         with get_db() as db:
-            # Mettre à jour le statut du WAN
+            # Mise à jour du WAN
             db.execute('''
                 UPDATE wans 
                 SET status = 'online', last_seen = datetime('now')
@@ -216,16 +203,16 @@ def update_wan_status():
     while True:
         try:
             with get_db() as db:
-                # Marquer comme hors ligne les WANs qui n'ont pas été vus depuis 2 minutes
+                # Marquer comme hors ligne les WANs qui n'ont pas été vus depuis 10 secondes
                 db.execute('''
                     UPDATE wans 
                     SET status = 'offline' 
-                    WHERE datetime('now', '-120 seconds') > last_seen
+                    WHERE datetime('now', '-10 seconds') > last_seen
                 ''')
                 db.commit()
         except Exception as e:
             logger.error(f"Erreur lors de la mise à jour des statuts: {str(e)}")
-        time.sleep(10)
+        time.sleep(5)  # Vérification toutes les 5 secondes
 
 @app.context_processor
 def inject_version():
