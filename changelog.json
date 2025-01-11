@@ -4,12 +4,31 @@
         {
             "version": "3.1.1",
             "type": "patch",
-            "date": "2025-01-11",
+            "date": "2024-01-11",
             "changes": [
-                "Optimisation majeure du code côté serveur",
-                "Retour à l'ancien système de changelog plus clair",
-                "Correction de divers bugs et incohérences",
-                "Amélioration des performances générales"
+                "Amélioration de la gestion du statut online/offline",
+                "Ajout du ping client toutes les secondes",
+                "Correction de bugs mineurs"
+            ]
+        },
+        {
+            "version": "3.1.0",
+            "type": "minor",
+            "date": "2024-01-10",
+            "changes": [
+                "Ajout de la détection automatique du sous-réseau",
+                "Amélioration de l'interface utilisateur",
+                "Ajout des notes de version"
+            ]
+        },
+        {
+            "version": "3.0.0",
+            "type": "major",
+            "date": "2024-01-09",
+            "changes": [
+                "Refonte complète de l'architecture",
+                "Nouveau système de scan réseau avec nmap",
+                "Interface web moderne avec Bootstrap 5"
             ]
         },
         {

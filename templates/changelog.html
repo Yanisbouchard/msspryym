@@ -57,25 +57,39 @@
 
     <div class="container mt-4">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header bg-primary text-white">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-history"></i> Notes de version
+                    <i class="fas fa-history"></i> Historique des versions
                 </h5>
             </div>
             <div class="card-body">
-                {% for change in changes %}
-                <div class="version-block">
-                    <h4>
-                        Version {{ change.version }}
-                        <small class="text-muted">{{ change.date }}</small>
-                    </h4>
-                    <ul>
-                        {% for item in change.changes %}
-                        <li>{{ item }}</li>
-                        {% endfor %}
-                    </ul>
+                <div class="timeline">
+                    {% for version in changelog.versions %}
+                    <div class="card mb-3 version-{{ version.type }}">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                Version {{ version.version }}
+                                {% if version.type == "major" %}
+                                <span class="badge bg-success">Majeure</span>
+                                {% elif version.type == "minor" %}
+                                <span class="badge bg-primary">Mineure</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Patch</span>
+                                {% endif %}
+                            </h5>
+                            <h6 class="card-subtitle mb-3 text-muted">{{ version.date }}</h6>
+                            <ul class="list-unstyled">
+                                {% for change in version.changes %}
+                                <li>
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    {{ change }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
         </div>
     </div>

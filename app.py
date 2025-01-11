@@ -76,18 +76,17 @@ def index():
 @app.route('/changelog')
 def changelog():
     """Affiche les notes de version"""
-    changes = [
-        {
-            'version': '3.1.1',
-            'date': '2024-01-11',
-            'changes': [
-                'Amélioration de la gestion du statut online/offline',
-                'Ajout du ping client toutes les secondes',
-                'Correction de bugs mineurs'
-            ]
-        }
-    ]
-    return render_template('changelog.html', changes=changes)
+    try:
+        changelog_path = os.path.join(os.path.dirname(__file__), 'changelog.json')
+        if not os.path.exists(changelog_path):
+            return render_template('error.html', message='Notes de version introuvables')
+        
+        with open(changelog_path, 'r', encoding='utf-8') as f:
+            changelog = json.load(f)
+        return render_template('changelog.html', changelog=changelog)
+    except Exception as e:
+        logger.error(f"Erreur lors de la lecture du changelog: {str(e)}")
+        return render_template('error.html', message='Erreur lors de la lecture des notes de version')
 
 @app.route('/wan/<client_id>')
 def wan_devices(client_id):
