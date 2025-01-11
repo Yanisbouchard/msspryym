@@ -185,6 +185,13 @@ def update_devices():
             return jsonify({'error': 'Données manquantes'}), 400
             
         with get_db() as db:
+            # Mettre à jour le statut du WAN
+            db.execute('''
+                UPDATE wans 
+                SET status = 'online', last_seen = datetime('now')
+                WHERE client_id = ?
+            ''', (data['wan_id'],))
+            
             # Supprimer les anciens appareils
             db.execute('DELETE FROM devices WHERE wan_id = ?', (data['wan_id'],))
             
@@ -209,11 +216,11 @@ def update_wan_status():
     while True:
         try:
             with get_db() as db:
-                # Marquer comme hors ligne les WANs qui n'ont pas été vus depuis 30 secondes
+                # Marquer comme hors ligne les WANs qui n'ont pas été vus depuis 2 minutes
                 db.execute('''
                     UPDATE wans 
                     SET status = 'offline' 
-                    WHERE datetime('now', '-30 seconds') > last_seen
+                    WHERE datetime('now', '-120 seconds') > last_seen
                 ''')
                 db.commit()
         except Exception as e:
