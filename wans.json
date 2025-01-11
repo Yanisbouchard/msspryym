@@ -1,0 +1,14 @@
+{
+    "WAN_TEST": {
+        "name": "Franchise Test",
+        "ip": "192.168.1.100",
+        "location": "Paris",
+        "status": "online",
+        "last_update": "2025-01-11T12:23:35.156273",
+        "network_info": {
+            "devices_count": 0,
+            "latency": 0,
+            "devices": []
+        }
+    }
+}

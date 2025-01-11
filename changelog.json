@@ -1,0 +1,66 @@
+{
+    "current_version": "2.1.2",
+    "versions": [
+        {
+            "version": "2.1.2",
+            "date": "2025-01-11",
+            "type": "patch",
+            "changes": [
+                "Amelioration de l'affichage de la version dans la barre de navigation",
+                "Suppression des accents restants dans l'interface"
+            ]
+        },
+        {
+            "version": "2.1.1",
+            "date": "2025-01-11",
+            "type": "patch",
+            "changes": [
+                "Ajout du bouton retour sur la page des notes de version",
+                "Correction des caracteres speciaux dans l'historique"
+            ]
+        },
+        {
+            "version": "2.1.0",
+            "date": "2025-01-11",
+            "type": "minor",
+            "changes": [
+                "Modification du systeme de connexion pour utiliser l'IP du serveur au lieu de localhost",
+                "Ajout du systeme de versionnage et notes de version",
+                "Amelioration de l'interface avec l'ajout du bouton Notes de version"
+            ]
+        },
+        {
+            "version": "2.0.0",
+            "date": "2025-01-11",
+            "type": "major",
+            "changes": [
+                "Refonte complete du systeme de gestion des WANs",
+                "Ajout du systeme d'enregistrement automatique des WANs",
+                "Migration vers une base de donnees SQLite pour la persistance des donnees",
+                "Nouveau systeme de monitoring en temps reel des WANs",
+                "Support multi-clients avec identification unique"
+            ]
+        },
+        {
+            "version": "1.1.0",
+            "date": "2025-01-10",
+            "type": "minor",
+            "changes": [
+                "Ajout du monitoring de latence",
+                "Affichage des statuts avec code couleur",
+                "Amelioration de l'interface utilisateur"
+            ]
+        },
+        {
+            "version": "1.0.0",
+            "date": "2025-01-09",
+            "type": "major",
+            "changes": [
+                "Version initiale du Seahawks Network Monitor",
+                "Interface de base pour la visualisation des WANs",
+                "Scan basique du reseau",
+                "Detection des appareils connectes"
+            ]
+        }
+    ]
+}

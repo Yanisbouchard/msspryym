@@ -1,46 +1,67 @@
-from ping3 import ping
-from typing import Dict, List
 import time
-from statistics import mean, median
+from collections import deque
+from statistics import mean
+from ping3 import ping
+from datetime import datetime, timedelta
 
 class NetworkMonitor:
     def __init__(self):
-        self.default_targets = [
-            '8.8.8.8',        # Google DNS
-            '1.1.1.1',        # Cloudflare DNS
-            '208.67.222.222'  # OpenDNS
-        ]
+        self.ping_history = {}  # Historique des pings par WAN
+        self.last_ping_time = {}  # Dernier temps de ping par WAN
+        self.ping_interval = 60  # 1 minute
+        self.history_size = 5  # Garder 5 minutes d'historique
+
+    def ping_host(self, host="8.8.8.8"):
+        """Ping un hôte et retourne la latence en ms."""
+        try:
+            latency = ping(host, timeout=2)
+            if latency is not None:
+                return round(latency * 1000)  # Conversion en ms
+            return None
+        except Exception:
+            return None
+
+    def check_latency(self, wan_id):
+        """Vérifie la latence pour un WAN spécifique et met à jour l'historique."""
+        current_time = time.time()
         
-    def measure_latency(self, target: str, count: int = 4) -> Dict:
-        """Mesure la latence vers une cible spécifique"""
-        latencies = []
-        packet_loss = 0
-        
-        for _ in range(count):
-            try:
-                start_time = time.time()
-                response_time = ping(target, timeout=2)
-                if response_time is not None:
-                    latencies.append(response_time * 1000)  # Conversion en ms
-                else:
-                    packet_loss += 1
-            except Exception:
-                packet_loss += 1
-            time.sleep(0.2)  # Petit délai entre les pings
-            
+        # Initialiser l'historique si nécessaire
+        if wan_id not in self.ping_history:
+            self.ping_history[wan_id] = deque(maxlen=self.history_size)
+            self.last_ping_time[wan_id] = 0
+
+        # Vérifier si c'est le moment de faire un nouveau ping
+        if current_time - self.last_ping_time.get(wan_id, 0) >= self.ping_interval:
+            latency = self.ping_host()
+            if latency is not None:
+                self.ping_history[wan_id].append(latency)
+                self.last_ping_time[wan_id] = current_time
+
+        # Calculer la moyenne sur les 5 dernières minutes
+        if self.ping_history[wan_id]:
+            avg_latency = mean(self.ping_history[wan_id])
+            status = self.get_latency_status(avg_latency)
+            return {
+                'current': list(self.ping_history[wan_id])[-1] if self.ping_history[wan_id] else None,
+                'average': round(avg_latency, 2),
+                'status': status,
+                'history': list(self.ping_history[wan_id])
+            }
         return {
-            'target': target,
-            'min': min(latencies) if latencies else None,
-            'max': max(latencies) if latencies else None,
-            'avg': mean(latencies) if latencies else None,
-            'median': median(latencies) if latencies else None,
-            'packet_loss': (packet_loss / count) * 100,
-            'samples': len(latencies)
+            'current': None,
+            'average': None,
+            'status': 'error',
+            'history': []
         }
-        
-    def check_wan_connectivity(self) -> List[Dict]:
-        """Vérifie la connectivité WAN vers plusieurs cibles"""
-        results = []
-        for target in self.default_targets:
-            results.append(self.measure_latency(target))
-        return results
+
+    def get_latency_status(self, latency):
+        """Détermine le statut basé sur la latence."""
+        if latency >= 200:
+            return 'danger'
+        elif latency >= 100:
+            return 'warning'
+        return 'success'
+
+    def get_all_latencies(self):
+        """Retourne toutes les latences pour tous les WANs."""
+        return {wan_id: self.check_latency(wan_id) for wan_id in self.ping_history.keys()}

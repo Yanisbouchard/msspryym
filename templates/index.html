@@ -14,104 +14,71 @@
             <span class="navbar-brand mb-0 h1">
                 <i class="fa fa-dashboard"></i> Seahawks Network Monitor
             </span>
-            <span id="update-status" class="text-light">
-                <i class="fa fa-refresh fa-spin"></i> Mise à jour en cours...
-            </span>
+            <div class="d-flex align-items-center">
+                <button class="btn btn-light me-3" data-bs-toggle="modal" data-bs-target="#addWANModal">
+                    <i class="fa fa-plus"></i> Ajouter un WAN
+                </button>
+                <a href="/changelog" class="btn btn-light me-3">
+                    <i class="fa fa-history"></i> Notes de version
+                </a>
+                <span class="badge bg-light text-primary me-3">
+                    <i class="fa fa-code-fork"></i> Version {{ current_version }}
+                </span>
+            </div>
         </div>
     </nav>
 
     <div class="container-fluid mt-4">
-        <div class="row">
-            <!-- System Information -->
-            <div class="col-md-12 mb-4">
-                <div class="card h-100">
+        <!-- Section WANs -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <div>
-                            <i class="fa fa-computer"></i> Informations Système
+                            <i class="fa fa-globe"></i> WANs Deployes
                         </div>
                         <div>
-                            <button class="btn btn-sm btn-light" id="refreshButton">
+                            <button class="btn btn-sm btn-light" id="refreshWANs">
                                 <i class="fa fa-refresh"></i> Actualiser
                             </button>
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5 class="card-title">CPU Usage</h5>
-                                <canvas id="cpuChart" height="100"></canvas>
-                            </div>
-                            <div class="col-md-6">
-                                <h5 class="card-title">RAM Usage</h5>
-                                <canvas id="ramChart" height="100"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Connected Devices -->
-            <div class="col-md-12 mb-4">
-                <div class="card h-100">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="fa fa-network-wired"></i> Appareils Connectés
-                            <span class="badge bg-light text-primary" id="devices-count">0</span>
-                        </div>
-                        <div>
-                            <button class="btn btn-sm btn-light" id="forceNetworkScan">
-                                <i class="fa fa-refresh"></i> Scanner
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-striped" id="devices-table">
-                                <thead>
-                                    <tr>
-                                        <th>IP</th>
-                                        <th>Hostname</th>
-                                        <th>MAC</th>
-                                        <th>Vendor</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
+                        <div class="row" id="wans-container"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal pour le scan des ports -->
-    <div class="modal fade" id="portScanModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <!-- Modal pour ajouter un WAN -->
+    <div class="modal fade" id="addWANModal" tabindex="-1">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Scan des Ports</h5>
+                    <h5 class="modal-title">Ajouter un nouveau WAN</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped" id="ports-table">
-                            <thead>
-                                <tr>
-                                    <th>Port</th>
-                                    <th>Service</th>
-                                    <th>Version</th>
-                                    <th>Protocole</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td colspan="4" class="text-center">En attente du scan...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <form id="addWANForm">
+                        <div class="mb-3">
+                            <label for="wanName" class="form-label">Nom du WAN</label>
+                            <input type="text" class="form-control" id="wanName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="wanLocation" class="form-label">Localisation</label>
+                            <input type="text" class="form-control" id="wanLocation" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Commande de deploiement</label>
+                            <div class="bg-light p-3 rounded">
+                                <code id="deployCommand">python seahawks_client.py --server http://{{ server_ip }}:5000 --name "<span class="text-primary">[nom]</span>" --location "<span class="text-primary">[localisation]</span>"</code>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="copyCommand()">
+                                <i class="fa fa-copy"></i> Copier
+                            </button>
+                        </div>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
@@ -120,8 +87,29 @@
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/wans.js') }}"></script>
+    <script>
+        const serverIP = "{{ server_ip }}";
+        
+        // Mise à jour de la commande de deploiement
+        document.getElementById('wanName').addEventListener('input', updateCommand);
+        document.getElementById('wanLocation').addEventListener('input', updateCommand);
+
+        function updateCommand() {
+            const name = document.getElementById('wanName').value || '[nom]';
+            const location = document.getElementById('wanLocation').value || '[localisation]';
+            const command = `python seahawks_client.py --server http://${serverIP}:5000 --name "${name}" --location "${location}"`;
+            document.getElementById('deployCommand').textContent = command;
+        }
+
+        function copyCommand() {
+            const command = document.getElementById('deployCommand').textContent;
+            navigator.clipboard.writeText(command).then(() => {
+                alert('Commande copiee dans le presse-papier !');
+            });
+        }
+    </script>
 </body>
 </html>
