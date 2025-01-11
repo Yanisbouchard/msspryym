@@ -1,225 +1,237 @@
-from flask import Flask, render_template, jsonify, request
+import os
+import json
+import sqlite3
+import logging
 import threading
-from updater import AutoUpdater
-from network_scanner import NetworkScanner
-from system_info import SystemInfo
-from network_monitor import NetworkMonitor
-from version import get_version
-from wan_manager import WANManager
 import time
 from datetime import datetime
-import socket
-import json
-import os
+from flask import Flask, render_template, jsonify, request
+from dotenv import load_dotenv
 
+# Chargement des variables d'environnement
+load_dotenv()
+
+# Configuration
+VERSION = '3.1.1'
+DATABASE_PATH = os.getenv('DATABASE_PATH', 'wans.db')
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+LOG_FILE = os.getenv('LOG_FILE', 'seahawks.log')
+
+# Configuration du logging
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Initialisation de Flask
 app = Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
 
-# Initialisation des classes
-scanner = NetworkScanner()
-system_info = SystemInfo()
-network_monitor = NetworkMonitor()
-wan_manager = WANManager()
+def get_db():
+    """Crée une connexion à la base de données"""
+    db = sqlite3.connect(DATABASE_PATH)
+    db.row_factory = sqlite3.Row
+    return db
 
-# Cache pour les données
-cache = {
-    'devices': [],
-    'system_info': {},
-    'wan_latency': [],
-    'version': get_version(),
-    'last_update': 0,
-    'cache_duration': 60  # Durée du cache en secondes
-}
+def init_db():
+    """Initialise la base de données"""
+    with get_db() as db:
+        db.executescript('''
+            CREATE TABLE IF NOT EXISTS wans (
+                client_id TEXT PRIMARY KEY,
+                name TEXT,
+                ip TEXT,
+                subnet TEXT,
+                location TEXT,
+                status TEXT DEFAULT 'offline',
+                last_seen TIMESTAMP,
+                latency REAL
+            );
 
-def get_local_ip():
-    """Récupère l'IP locale du serveur"""
-    try:
-        # Crée une connexion temporaire pour obtenir l'IP locale
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return '0.0.0.0'
+            CREATE TABLE IF NOT EXISTS devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                wan_id TEXT,
+                ip TEXT,
+                hostname TEXT,
+                mac TEXT,
+                vendor TEXT,
+                status TEXT DEFAULT 'down',
+                last_seen TIMESTAMP,
+                FOREIGN KEY (wan_id) REFERENCES wans(client_id)
+            );
+        ''')
 
-def get_changelog():
-    """Charge le changelog depuis le fichier"""
-    try:
-        with open('changelog.json', 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Erreur lors du chargement du changelog: {str(e)}")
-        return {
-            "current_version": "0.0.0",
-            "versions": []
-        }
-
-def update_cache():
-    """Met à jour le cache en arrière-plan"""
-    while True:
-        try:
-            current_time = time.time()
-            if current_time - cache['last_update'] >= cache['cache_duration']:
-                # Mise à jour des données
-                cache['devices'] = scanner.scan_network()
-                cache['system_info'] = system_info.get_system_info()
-                cache['wan_latency'] = network_monitor.check_wan_connectivity()
-                cache['last_update'] = current_time
-        except Exception as e:
-            print(f"Erreur lors de la mise à jour du cache: {str(e)}")
-        time.sleep(10)  # Attente avant la prochaine vérification
-
-def cleanup_thread():
-    """Thread pour nettoyer les anciennes données"""
-    while True:
-        wan_manager.cleanup_old_data()
-        time.sleep(3600)  # Nettoyage toutes les heures
-
+# Routes principales
 @app.route('/')
 def index():
-    """Page principale du dashboard"""
-    server_ip = get_local_ip()
-    changelog = get_changelog()
-    return render_template('index.html', 
-                         server_ip=server_ip,
-                         current_version=changelog['current_version'])
+    """Page d'accueil"""
+    try:
+        server_ip = request.host.split(':')[0]
+        return render_template('index.html', server_ip=server_ip)
+    except Exception as e:
+        logger.error(f"Erreur lors du chargement de l'index: {str(e)}")
+        return render_template('error.html', message='Erreur serveur')
 
 @app.route('/changelog')
 def changelog():
-    return render_template('changelog.html', changelog=get_changelog())
-
-@app.route('/api/devices')
-def get_devices():
-    """API pour obtenir la liste des appareils"""
-    return jsonify(cache['devices'])
-
-@app.route('/api/system')
-def get_system():
-    """API pour obtenir les informations système"""
-    return jsonify(cache['system_info'])
-
-@app.route('/api/latency')
-def get_latency():
-    """API pour obtenir les informations de latence"""
-    return jsonify(cache['wan_latency'])
-
-@app.route('/api/ports/<ip>')
-def get_ports(ip):
-    """API pour scanner les ports d'une IP spécifique"""
-    ports = scanner.scan_ports(ip)
-    return jsonify(ports)
-
-@app.route('/api/processes')
-def get_processes():
-    """API pour obtenir la liste des processus"""
-    processes = system_info.get_process_info()
-    return jsonify(processes)
-
-@app.route('/api/system/realtime')
-def get_realtime_system():
-    """Récupère les informations système en temps réel"""
-    return jsonify({
-        'cpu': {
-            'usage': system_info.get_cpu_usage(),
-            'per_core': system_info.get_per_core_usage()
-        },
-        'memory': system_info.get_memory_info(),
-        'timestamp': datetime.now().isoformat()
-    })
-
-@app.route('/api/network/scan', methods=['POST'])
-def force_network_scan():
-    """Force un nouveau scan du réseau"""
+    """Affiche les notes de version"""
     try:
-        devices = scanner.scan_network()
-        # Mise à jour du cache
-        cache['devices'] = devices
-        cache['last_update'] = time.time()
-        return jsonify(devices)
+        changelog_path = os.path.join(os.path.dirname(__file__), 'changelog.json')
+        if not os.path.exists(changelog_path):
+            return render_template('error.html', message='Notes de version introuvables')
+        
+        with open(changelog_path, 'r', encoding='utf-8') as f:
+            changelog = json.load(f)
+        return render_template('changelog.html', changelog=changelog, version=VERSION)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Erreur lors de la lecture du changelog: {str(e)}")
+        return render_template('error.html', message='Erreur lors de la lecture des notes de version')
 
-@app.route('/api/version')
-def get_version_info():
-    """Retourne la version actuelle"""
-    changelog = get_changelog()
-    return jsonify({
-        'version': changelog['current_version'],
-        'changelog': changelog['versions']
-    })
+@app.route('/wan/<client_id>')
+def wan_devices(client_id):
+    """Affiche les appareils d'un WAN"""
+    try:
+        with get_db() as db:
+            cursor = db.execute('SELECT * FROM wans WHERE client_id = ?', (client_id,))
+            wan = cursor.fetchone()
+            if not wan:
+                return render_template('error.html', message='WAN non trouvé')
+            
+            cursor = db.execute('SELECT * FROM devices WHERE wan_id = ?', (client_id,))
+            devices = cursor.fetchall()
+            
+            return render_template('devices.html', wan=dict(wan), devices=[dict(d) for d in devices])
+    except Exception as e:
+        logger.error(f"Erreur lors de l'affichage des appareils: {str(e)}")
+        return render_template('error.html', message='Erreur lors de la récupération des appareils')
 
-@app.route('/api/wans')
+# Routes API
+@app.route('/api/wans', methods=['GET'])
 def get_wans():
-    """Retourne la liste des WANs"""
-    return jsonify(wan_manager.get_all_wans())
+    """Récupère la liste des WANs"""
+    try:
+        with get_db() as db:
+            cursor = db.execute('''
+                SELECT client_id, name, location, ip, subnet, status, last_seen, latency
+                FROM wans ORDER BY name
+            ''')
+            return jsonify([dict(row) for row in cursor.fetchall()])
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des WANs: {str(e)}")
+        return jsonify({'error': 'Erreur serveur'}), 500
 
-@app.route('/api/wans/<client_id>')
+@app.route('/api/wans/<client_id>', methods=['GET'])
 def get_wan(client_id):
-    """Retourne les données d'un WAN spécifique"""
-    wan = wan_manager.get_wan(client_id)
-    if wan is None:
-        return jsonify({'error': 'WAN non trouvé'}), 404
-    return jsonify(wan)
+    """Récupère les détails d'un WAN"""
+    try:
+        with get_db() as db:
+            cursor = db.execute('SELECT * FROM wans WHERE client_id = ?', (client_id,))
+            wan = cursor.fetchone()
+            if not wan:
+                return jsonify({'error': 'WAN non trouvé'}), 404
+            return jsonify(dict(wan))
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération du WAN: {str(e)}")
+        return jsonify({'error': 'Erreur serveur'}), 500
 
-@app.route('/api/wans/<client_id>/devices')
-def get_wan_devices(client_id):
-    """Retourne la liste des appareils connectés à un WAN"""
-    wan = wan_manager.get_wan(client_id)
-    if wan is None:
-        return jsonify({'error': 'WAN non trouvé'}), 404
-    return jsonify(wan_manager.get_wan_devices(client_id))
+@app.route('/api/wans/<client_id>', methods=['DELETE'])
+def delete_wan(client_id):
+    """Supprime un WAN"""
+    try:
+        with get_db() as db:
+            db.execute('DELETE FROM devices WHERE wan_id = ?', (client_id,))
+            db.execute('DELETE FROM wans WHERE client_id = ?', (client_id,))
+            db.commit()
+            return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression du WAN: {str(e)}")
+        return jsonify({'error': 'Erreur serveur'}), 500
 
 @app.route('/api/register', methods=['POST'])
 def register_wan():
     """Enregistre un nouveau WAN"""
-    data = request.get_json()
-    if not data or not all(k in data for k in ('client_id', 'name', 'location', 'hostname', 'ip', 'subnet')):
-        return jsonify({'error': 'Données manquantes'}), 400
+    try:
+        data = request.json
+        required_fields = ['client_id', 'name', 'ip', 'subnet', 'location']
         
-    if wan_manager.register_wan(data):
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Données manquantes'}), 400
+            
+        with get_db() as db:
+            db.execute('''
+                INSERT OR REPLACE INTO wans 
+                (client_id, name, ip, subnet, location, status, last_seen)
+                VALUES (?, ?, ?, ?, ?, 'online', datetime('now'))
+            ''', (data['client_id'], data['name'], data['ip'], 
+                  data['subnet'], data['location']))
+            db.commit()
+            
         return jsonify({'success': True})
-    return jsonify({'error': 'Erreur lors de l\'enregistrement'}), 500
+    except Exception as e:
+        logger.error(f"Erreur lors de l'enregistrement du WAN: {str(e)}")
+        return jsonify({'error': 'Erreur serveur'}), 500
 
-@app.route('/api/update', methods=['POST'])
-def update_wan():
-    """Met à jour les données d'un WAN"""
-    data = request.get_json()
-    if not data or not all(k in data for k in ('client_id', 'timestamp', 'latency', 'devices')):
-        return jsonify({'error': 'Données manquantes'}), 400
-        
-    if wan_manager.update_wan_status(data):
+@app.route('/api/devices/update', methods=['POST'])
+def update_devices():
+    """Met à jour les appareils d'un WAN"""
+    try:
+        data = request.json
+        if not data or 'wan_id' not in data or 'devices' not in data:
+            return jsonify({'error': 'Données manquantes'}), 400
+            
+        with get_db() as db:
+            # Supprimer les anciens appareils
+            db.execute('DELETE FROM devices WHERE wan_id = ?', (data['wan_id'],))
+            
+            # Ajouter les nouveaux appareils
+            for device in data['devices']:
+                db.execute('''
+                    INSERT INTO devices 
+                    (wan_id, ip, hostname, mac, vendor, status, last_seen)
+                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                ''', (data['wan_id'], device['ip'], device.get('hostname', 'Unknown'), 
+                      device.get('mac', 'Unknown'), device.get('vendor', 'Unknown'), 
+                      device.get('status', 'unknown')))
+            db.commit()
+            
         return jsonify({'success': True})
-    return jsonify({'error': 'Erreur lors de la mise à jour'}), 500
+    except Exception as e:
+        logger.error(f"Erreur lors de la mise à jour des appareils: {str(e)}")
+        return jsonify({'error': 'Erreur serveur'}), 500
 
-@app.route('/wan/<client_id>')
-def wan_details(client_id):
-    """Affiche les détails d'un WAN"""
-    wan = wan_manager.get_wan(client_id)
-    if wan is None:
-        return "WAN non trouvé", 404
-    changelog = get_changelog()
-    return render_template('wan_details.html', 
-                         wan=wan,
-                         current_version=changelog['current_version'])
+def update_wan_status():
+    """Met à jour le statut des WANs"""
+    while True:
+        try:
+            with get_db() as db:
+                # Marquer comme hors ligne les WANs qui n'ont pas été vus depuis 30 secondes
+                db.execute('''
+                    UPDATE wans 
+                    SET status = 'offline' 
+                    WHERE datetime('now', '-30 seconds') > last_seen
+                ''')
+                db.commit()
+        except Exception as e:
+            logger.error(f"Erreur lors de la mise à jour des statuts: {str(e)}")
+        time.sleep(10)
+
+@app.context_processor
+def inject_version():
+    """Injecte la version dans tous les templates"""
+    return {'version': VERSION}
 
 if __name__ == '__main__':
-    # Démarrage du thread de mise à jour du cache
-    cache_thread = threading.Thread(target=update_cache, daemon=True)
-    cache_thread.start()
+    # Initialisation
+    init_db()
     
-    # Démarrage du thread de nettoyage
-    cleanup_thread = threading.Thread(target=cleanup_thread, daemon=True)
-    cleanup_thread.start()
+    # Démarrage du thread de mise à jour des statuts
+    status_thread = threading.Thread(target=update_wan_status, daemon=True)
+    status_thread.start()
     
-    # Démarrage de l'auto-updater
-    updater = AutoUpdater()
-    updater_thread = threading.Thread(target=updater.start, daemon=True)
-    updater_thread.start()
-    
-    # Affichage de l'IP du serveur et de la version
-    server_ip = get_local_ip()
-    changelog = get_changelog()
-    print(f"\nServeur démarré sur : http://{server_ip}:5000\n")
-    print(f"Version actuelle : {changelog['current_version']}\n")
-    
+    # Démarrage du serveur
     app.run(host='0.0.0.0', port=5000, debug=True)

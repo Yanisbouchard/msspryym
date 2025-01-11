@@ -1,124 +1,122 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seahawks - Détails WAN</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <nav class="navbar navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a href="/" class="navbar-brand">
-                <i class="fa fa-arrow-left"></i> Retour au tableau de bord
+{% extends "base.html" %}
+
+{% block title %}Details WAN{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Details du WAN : {{ wan.name }}</h2>
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
             </a>
-            <span class="navbar-text">
-                <i class="fa fa-globe"></i> {{ wan.name }}
-            </span>
         </div>
-    </nav>
+    </div>
 
-    <div class="container-fluid mt-4">
-        <!-- WAN Info Card -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="card-title mb-0">
-                            Informations WAN
-                            <span class="badge float-end" id="latency-badge">
-                                Chargement...
-                            </span>
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <p><strong>Location:</strong> {{ wan.location }}</p>
-                            </div>
-                            <div class="col-md-4">
-                                <p><strong>IP:</strong> {{ wan.ip }}</p>
-                            </div>
-                            <div class="col-md-4">
-                                <p><strong>Latence moyenne:</strong> <span id="avg-latency">Chargement...</span></p>
-                            </div>
-                        </div>
-                    </div>
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Informations</h4>
                 </div>
-            </div>
-        </div>
-
-        <!-- Connected Devices -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="fa fa-network-wired"></i> Appareils Connectés
-                            <span class="badge bg-light text-primary" id="devices-count">0</span>
-                        </div>
-                        <div>
-                            <button class="btn btn-sm btn-light" id="forceNetworkScan">
-                                <i class="fa fa-refresh"></i> Scanner
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-striped" id="devices-table">
-                                <thead>
-                                    <tr>
-                                        <th>IP</th>
-                                        <th>Hostname</th>
-                                        <th>MAC</th>
-                                        <th>Vendor</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div class="card-body">
+                    <p><strong>ID:</strong> {{ wan.client_id }}</p>
+                    <p><strong>Localisation:</strong> {{ wan.location }}</p>
+                    <p><strong>IP:</strong> {{ wan.ip }}</p>
+                    <p><strong>Subnet:</strong> {{ wan.subnet }}</p>
+                    <p><strong>Statut:</strong> 
+                        <span class="badge bg-{{ 'success' if wan.status == 'online' else 'danger' }}">
+                            {{ wan.status|upper }}
+                        </span>
+                    </p>
+                    {% if wan.latency %}
+                    <p><strong>Latence:</strong> {{ "%.2f"|format(wan.latency) }} ms</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal pour le scan des ports -->
-    <div class="modal fade" id="portScanModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Scan des ports</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Appareils detectes</h4>
+                    <button id="refreshDevices" class="btn btn-primary">
+                        <i class="fas fa-sync-alt"></i> Rafraichir
+                    </button>
                 </div>
-                <div class="modal-body">
+                <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-sm" id="ports-table">
+                        <table class="table table-striped">
                             <thead>
                                 <tr>
-                                    <th>Port</th>
-                                    <th>Service</th>
-                                    <th>État</th>
+                                    <th>IP</th>
+                                    <th>Hostname</th>
+                                    <th>MAC</th>
+                                    <th>Fabricant</th>
+                                    <th>Statut</th>
                                 </tr>
                             </thead>
-                            <tbody></tbody>
+                            <tbody id="devicesTableBody">
+                                {% for device in devices %}
+                                <tr>
+                                    <td>{{ device.ip }}</td>
+                                    <td>{{ device.hostname }}</td>
+                                    <td>{{ device.mac }}</td>
+                                    <td>{{ device.vendor }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if device.status == 'up' else 'danger' }}">
+                                            {{ device.status|upper }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Injection des données du WAN
-        const WAN_ID = "{{ wan.id }}";
-    </script>
-    <script src="{{ url_for('static', filename='js/wan_details.js') }}"></script>
-</body>
-</html>
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const refreshButton = document.getElementById('refreshDevices');
+    const tableBody = document.getElementById('devicesTableBody');
+    const wanId = '{{ wan.client_id }}';
+
+    function refreshDevices() {
+        fetch(`/api/wans/${wanId}/devices`)
+            .then(response => response.json())
+            .then(devices => {
+                tableBody.innerHTML = '';
+                devices.forEach(device => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${device.ip}</td>
+                        <td>${device.hostname || 'N/A'}</td>
+                        <td>${device.mac || 'N/A'}</td>
+                        <td>${device.vendor || 'N/A'}</td>
+                        <td>
+                            <span class="badge bg-${device.status === 'up' ? 'success' : 'danger'}">
+                                ${device.status.toUpperCase()}
+                            </span>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            })
+            .catch(error => console.error('Erreur:', error));
+    }
+
+    refreshButton.addEventListener('click', refreshDevices);
+
+    // Rafraichissement automatique toutes les 30 secondes
+    setInterval(refreshDevices, 30000);
+});
+</script>
+{% endblock %}

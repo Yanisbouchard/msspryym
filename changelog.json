@@ -1,10 +1,98 @@
 {
-    "current_version": "2.1.2",
+    "current_version": "3.1.1",
     "versions": [
         {
-            "version": "2.1.2",
-            "date": "2025-01-11",
+            "version": "3.1.1",
             "type": "patch",
+            "date": "2025-01-11",
+            "changes": [
+                "Optimisation majeure du code côté serveur",
+                "Retour à l'ancien système de changelog plus clair",
+                "Correction de divers bugs et incohérences",
+                "Amélioration des performances générales"
+            ]
+        },
+        {
+            "version": "3.0.1",
+            "type": "patch",
+            "date": "2025-01-11",
+            "changes": [
+                "Correction du statut ON/OFF des WANs",
+                "Amelioration de la page de details des WANs",
+                "Ajout de la verification automatique des statuts",
+                "Correction des problemes d'encodage",
+                "Mise a jour de l'interface utilisateur"
+            ]
+        },
+        {
+            "version": "3.0.0",
+            "type": "major",
+            "date": "2025-01-11",
+            "changes": [
+                "Optimisation majeure des performances du serveur avec mise en cache",
+                "Amelioration du systeme de logging pour un meilleur suivi",
+                "Refonte du systeme de detection de l'etat des WANs (ON/DOWN)",
+                "Reduction de l'intervalle de rafraichissement a 20 secondes",
+                "Support ameliore pour les reseaux externes",
+                "Amelioration de la gestion des erreurs"
+            ]
+        },
+        {
+            "version": "2.1.7",
+            "type": "patch",
+            "date": "2025-01-11",
+            "changes": [
+                "Ajout de la fonctionnalite de suppression des WANs",
+                "Amelioration de l'interface avec un bouton de suppression",
+                "Confirmation avant la suppression d'un WAN"
+            ]
+        },
+        {
+            "version": "2.1.6",
+            "type": "patch",
+            "date": "2025-01-11",
+            "changes": [
+                "Correction du problème des WANs en double",
+                "Utilisation de l'IP comme identifiant unique pour les WANs",
+                "Amélioration de la gestion des mises à jour des WANs existants"
+            ]
+        },
+        {
+            "version": "2.1.5",
+            "type": "patch",
+            "date": "2025-01-11",
+            "changes": [
+                "Ajout du scan des ports pour les appareils connectés",
+                "Amélioration de l'interface du scan des ports avec indicateur de chargement",
+                "Ajout d'un modal pour afficher les résultats du scan des ports"
+            ]
+        },
+        {
+            "version": "2.1.4",
+            "type": "patch",
+            "date": "2025-01-11",
+            "changes": [
+                "Amélioration du bouton de scan avec indicateur de chargement",
+                "Correction de l'intégration Flask dans le client",
+                "Correction des routes de scan réseau",
+                "Amélioration de la gestion des erreurs lors du scan"
+            ]
+        },
+        {
+            "version": "2.1.3",
+            "type": "patch",
+            "date": "2025-01-11",
+            "changes": [
+                "Correction des doublons de WANs lors de l'enregistrement",
+                "Correction du lien vers les appareils connectes",
+                "Ajout de la verification du client_id pour eviter les erreurs 404",
+                "Ajout de la methode check_wan_connectivity manquante"
+            ]
+        },
+        {
+            "version": "2.1.2",
+            "type": "patch",
+            "date": "2025-01-11",
             "changes": [
                 "Amelioration de l'affichage de la version dans la barre de navigation",
                 "Suppression des accents restants dans l'interface"
@@ -12,8 +100,8 @@
         },
         {
             "version": "2.1.1",
-            "date": "2025-01-11",
             "type": "patch",
+            "date": "2025-01-11",
             "changes": [
                 "Ajout du bouton retour sur la page des notes de version",
                 "Correction des caracteres speciaux dans l'historique"
@@ -21,8 +109,8 @@
         },
         {
             "version": "2.1.0",
-            "date": "2025-01-11",
             "type": "minor",
+            "date": "2025-01-11",
             "changes": [
                 "Modification du systeme de connexion pour utiliser l'IP du serveur au lieu de localhost",
                 "Ajout du systeme de versionnage et notes de version",
@@ -31,8 +119,8 @@
         },
         {
             "version": "2.0.0",
-            "date": "2025-01-11",
             "type": "major",
+            "date": "2025-01-11",
             "changes": [
                 "Refonte complete du systeme de gestion des WANs",
                 "Ajout du systeme d'enregistrement automatique des WANs",
@@ -43,8 +131,8 @@
         },
         {
             "version": "1.1.0",
-            "date": "2025-01-10",
             "type": "minor",
+            "date": "2025-01-10",
             "changes": [
                 "Ajout du monitoring de latence",
                 "Affichage des statuts avec code couleur",
@@ -53,8 +141,8 @@
         },
         {
             "version": "1.0.0",
-            "date": "2025-01-09",
             "type": "major",
+            "date": "2025-01-09",
             "changes": [
                 "Version initiale du Seahawks Network Monitor",
                 "Interface de base pour la visualisation des WANs",

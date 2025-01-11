@@ -1,102 +1,117 @@
-// Gestionnaire des WANs
 class WANManager {
     constructor() {
-        this.updateInterval = 60000; // 1 minute
-        this.startUpdates();
+        this.refreshInterval = 20000; // 20 secondes
+        this.initEventListeners();
+        this.startAutoRefresh();
     }
 
-    createWANCard(wan) {
-        const statusClass = this.getStatusClass(wan.latency_status);
-        const card = document.createElement('div');
-        card.className = 'col-md-4 mb-4';
-        card.innerHTML = `
-            <div class="card wan-card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">
-                        ${wan.name}
-                        <span class="badge ${statusClass} float-end">
-                            ${wan.latency ? wan.latency + ' ms' : 'N/A'}
-                        </span>
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        <strong>Location:</strong> ${wan.location}<br>
-                        <strong>IP:</strong> ${wan.ip}<br>
-                        <strong>Latence moyenne:</strong> 
-                        <span class="${statusClass}">
-                            ${wan.avg_latency ? wan.avg_latency + ' ms' : 'N/A'}
-                        </span>
-                    </p>
-                    <a href="/wan/${wan.id}" class="btn btn-primary w-100">
-                        <i class="fa fa-network-wired"></i> Voir les appareils connectés
-                    </a>
-                </div>
-            </div>
-        `;
-        return card;
+    initEventListeners() {
+        // Bouton de rafraîchissement
+        document.getElementById('refreshWANs').addEventListener('click', () => {
+            this.refreshWANs();
+        });
+
+        // Délégation d'événements pour les boutons de suppression
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.delete-wan')) {
+                const button = e.target.closest('.delete-wan');
+                const wanId = button.dataset.wanId;
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                
+                // Stocker l'ID du WAN à supprimer
+                document.getElementById('confirmDelete').dataset.wanId = wanId;
+                
+                // Afficher la modal
+                deleteModal.show();
+            }
+        });
+
+        // Confirmation de suppression
+        document.getElementById('confirmDelete').addEventListener('click', (e) => {
+            const wanId = e.target.dataset.wanId;
+            this.deleteWAN(wanId);
+            
+            // Fermer la modal
+            const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+            deleteModal.hide();
+        });
     }
 
-    getStatusClass(status) {
-        switch (status) {
-            case 'danger':
-                return 'bg-danger';
-            case 'warning':
-                return 'bg-warning text-dark';
-            case 'success':
-                return 'bg-success';
-            default:
-                return 'bg-secondary';
+    async deleteWAN(wanId) {
+        try {
+            const response = await fetch(`/api/wans/${wanId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) throw new Error('Erreur réseau');
+
+            // Rafraîchir la liste des WANs
+            this.refreshWANs();
+        } catch (error) {
+            console.error('Erreur lors de la suppression du WAN:', error);
+            alert('Erreur lors de la suppression du WAN');
         }
     }
 
-    updateWANCard(wan) {
-        const card = document.querySelector(`[data-wan-id="${wan.id}"]`);
-        if (!card) return;
-
-        const statusBadge = card.querySelector('.badge');
-        const avgLatencySpan = card.querySelector('.card-text span');
-        
-        statusBadge.className = `badge ${this.getStatusClass(wan.latency_status)} float-end`;
-        statusBadge.textContent = wan.latency ? `${wan.latency} ms` : 'N/A';
-        
-        avgLatencySpan.className = this.getStatusClass(wan.latency_status);
-        avgLatencySpan.textContent = wan.avg_latency ? `${wan.avg_latency} ms` : 'N/A';
-    }
-
-    async updateWANs() {
+    async refreshWANs() {
         try {
             const response = await fetch('/api/wans');
             if (!response.ok) throw new Error('Erreur réseau');
             
             const wans = await response.json();
             const container = document.getElementById('wans-container');
+            container.innerHTML = '';
             
-            // Première mise à jour
-            if (container.children.length === 0) {
-                wans.forEach(wan => {
-                    const card = this.createWANCard(wan);
-                    card.querySelector('.wan-card').setAttribute('data-wan-id', wan.id);
-                    container.appendChild(card);
-                });
-            }
-            // Mises à jour suivantes
-            else {
-                wans.forEach(wan => this.updateWANCard(wan));
-            }
+            wans.forEach(wan => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 mb-4';
+                col.innerHTML = `
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">${wan.name}</h5>
+                            <span class="badge bg-${wan.status === 'online' ? 'success' : 'danger'}">
+                                ${wan.status === 'online' ? 'ON' : 'OFF'}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Location:</strong> ${wan.location}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>IP:</strong> ${wan.ip}</p>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <a href="/wans/${wan.client_id}" class="btn btn-primary">
+                                    <i class="fas fa-desktop"></i> Voir les appareils
+                                </a>
+                                <button class="btn btn-danger delete-wan" data-wan-id="${wan.client_id}">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
         } catch (error) {
-            console.error('Erreur lors de la mise à jour des WANs:', error);
+            console.error('Erreur lors du rafraîchissement des WANs:', error);
         }
     }
 
-    startUpdates() {
-        this.updateWANs();
-        setInterval(() => this.updateWANs(), this.updateInterval);
+    startAutoRefresh() {
+        // Rafraîchissement initial
+        this.refreshWANs();
+        
+        // Rafraîchissement automatique
+        setInterval(() => {
+            this.refreshWANs();
+        }, this.refreshInterval);
     }
 }
 
-// Création et démarrage du gestionnaire
-const wanManager = new WANManager();
+// Initialisation
 document.addEventListener('DOMContentLoaded', () => {
-    wanManager.startUpdates();
+    new WANManager();
 });

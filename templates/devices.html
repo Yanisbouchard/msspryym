@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seahawks - Appareils du WAN</title>
+    
+    <!-- CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-network-wired"></i> Seahawks
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home"></i> Accueil
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/changelog">
+                            <i class="fas fa-history"></i> Notes de version
+                        </a>
+                    </li>
+                </ul>
+                <span class="navbar-text">
+                    Version {{ version }}
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- En-tête WAN -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-network-wired"></i> {{ wan.name }}
+                    </h5>
+                    <span class="badge bg-{{ 'success' if wan.status == 'online' else 'danger' }}">
+                        {{ wan.status|upper }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <p><strong>Location:</strong> {{ wan.location }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>IP:</strong> {{ wan.ip }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Subnet:</strong> {{ wan.subnet }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste des appareils -->
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-desktop"></i> Appareils connectés
+                </h5>
+                <button class="btn btn-sm btn-light" id="refreshDevices">
+                    <i class="fas fa-sync-alt"></i> Actualiser
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Hostname</th>
+                                <th>IP</th>
+                                <th>MAC</th>
+                                <th>Fabricant</th>
+                                <th>Statut</th>
+                                <th>Dernière vue</th>
+                            </tr>
+                        </thead>
+                        <tbody id="devices-list">
+                            {% for device in devices %}
+                            <tr>
+                                <td>{{ device.hostname }}</td>
+                                <td>{{ device.ip }}</td>
+                                <td>{{ device.mac }}</td>
+                                <td>{{ device.vendor }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if device.status == 'up' else 'danger' }}">
+                                        {{ device.status|upper }}
+                                    </span>
+                                </td>
+                                <td>{{ device.last_seen }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Rafraîchissement automatique des appareils
+        function refreshDevices() {
+            $.get(`/api/devices?wan_id={{ wan.client_id }}`, function(devices) {
+                const tbody = document.getElementById('devices-list');
+                tbody.innerHTML = '';
+                
+                devices.forEach(device => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${device.hostname}</td>
+                            <td>${device.ip}</td>
+                            <td>${device.mac}</td>
+                            <td>${device.vendor}</td>
+                            <td>
+                                <span class="badge bg-${device.status === 'up' ? 'success' : 'danger'}">
+                                    ${device.status.toUpperCase()}
+                                </span>
+                            </td>
+                            <td>${device.last_seen}</td>
+                        </tr>
+                    `;
+                });
+            });
+        }
+
+        // Rafraîchissement manuel
+        document.getElementById('refreshDevices').addEventListener('click', refreshDevices);
+
+        // Rafraîchissement automatique toutes les 30 secondes
+        setInterval(refreshDevices, 30000);
+    </script>
+</body>
+</html>
