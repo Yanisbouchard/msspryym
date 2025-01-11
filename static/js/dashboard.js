@@ -3,6 +3,7 @@ const REFRESH_INTERVAL = 300000; // 5 minutes (300000 ms)
 let latencyChart = null;
 let cpuChart = null;
 let ramChart = null;
+let portScanModal = null;
 
 // Configuration des graphiques
 const chartOptions = {
@@ -201,25 +202,20 @@ function updateNetworkLatency() {
 function updateDevices() {
     fetch('/api/devices')
         .then(response => response.json())
-        .then(data => {
-            const devicesCount = document.getElementById('devices-count');
-            devicesCount.textContent = data.length;
-            
+        .then(devices => {
             const tbody = document.querySelector('#devices-table tbody');
-            tbody.innerHTML = data.map(device => `
+            document.getElementById('devices-count').textContent = devices.length;
+            
+            tbody.innerHTML = devices.map(device => `
                 <tr>
                     <td>${device.ip}</td>
                     <td>${device.hostname}</td>
                     <td>${device.mac}</td>
                     <td>${device.vendor}</td>
+                    <td><span class="badge bg-success">${device.status}</span></td>
                     <td>
-                        <span class="badge ${device.status === 'up' ? 'bg-success' : 'bg-danger'}">
-                            ${device.status}
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-primary" onclick="scanPorts('${device.ip}')">
-                            Scan Ports
+                        <button class="btn btn-primary btn-sm" onclick="scanPorts('${device.ip}')">
+                            <i class="fa fa-search"></i> Scan Ports
                         </button>
                     </td>
                 </tr>
@@ -245,25 +241,42 @@ function updateProcesses() {
 
 // Fonction pour scanner les ports d'un appareil
 function scanPorts(ip) {
-    const modal = new bootstrap.Modal(document.getElementById('portScanModal'));
-    modal.show();
+    if (!portScanModal) {
+        portScanModal = new bootstrap.Modal(document.getElementById('portScanModal'));
+    }
     
+    // Réinitialiser le contenu de la modal
+    document.querySelector('#ports-table tbody').innerHTML = '<tr><td colspan="4" class="text-center">Scan en cours...</td></tr>';
+    
+    // Afficher la modal
+    portScanModal.show();
+    
+    // Lancer le scan
     fetch(`/api/ports/${ip}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             const tbody = document.querySelector('#ports-table tbody');
-            if (data.length === 0) {
+            if (!data || data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" class="text-center">Aucun port ouvert trouvé</td></tr>';
             } else {
                 tbody.innerHTML = data.map(port => `
                     <tr>
                         <td>${port.port}</td>
-                        <td>${port.service}</td>
-                        <td>${port.version}</td>
-                        <td>${port.protocol}</td>
+                        <td>${port.service || 'Inconnu'}</td>
+                        <td>${port.version || 'Inconnu'}</td>
+                        <td>${port.protocol || 'Inconnu'}</td>
                     </tr>
                 `).join('');
             }
+        })
+        .catch(error => {
+            document.querySelector('#ports-table tbody').innerHTML = 
+                `<tr><td colspan="4" class="text-center text-danger">Erreur: ${error.message}</td></tr>`;
         });
 }
 
@@ -272,20 +285,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initCharts();
     updateCharts();
     updateSystemInfo();
-    updateNetworkLatency();
     updateDevices();
-    updateProcesses();
+    updateNetworkLatency();
     
-    // Event listeners pour les boutons
+    // Initialiser la modal
+    portScanModal = new bootstrap.Modal(document.getElementById('portScanModal'));
+    
+    // Gestionnaires d'événements
     document.getElementById('refreshButton').addEventListener('click', updateCharts);
     document.getElementById('forceNetworkScan').addEventListener('click', forceNetworkScan);
     
-    // Rafraîchissement automatique toutes les 5 minutes
+    // Rafraîchissement périodique
     setInterval(() => {
         updateCharts();
         updateSystemInfo();
-        updateNetworkLatency();
         updateDevices();
-        updateProcesses();
+        updateNetworkLatency();
     }, REFRESH_INTERVAL);
 });

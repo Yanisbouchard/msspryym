@@ -73,36 +73,36 @@ def get_processes():
 @app.route('/api/system/realtime')
 def get_realtime_system():
     """Récupère les informations système en temps réel"""
-    system_info = SystemInfo()
     return jsonify({
         'cpu': {
             'usage': system_info.get_cpu_usage(),
             'per_core': system_info.get_per_core_usage()
         },
-        'memory': {
-            'total': system_info.get_memory_info()['total'],
-            'used': system_info.get_memory_info()['used'],
-            'percent': system_info.get_memory_info()['percent']
-        },
+        'memory': system_info.get_memory_info(),
         'timestamp': datetime.now().isoformat()
     })
 
 @app.route('/api/network/scan', methods=['POST'])
 def force_network_scan():
     """Force un nouveau scan du réseau"""
-    scanner = NetworkScanner()
-    devices = scanner.scan_network()
-    return jsonify(devices)
+    try:
+        devices = scanner.scan_network()
+        # Mise à jour du cache
+        cache['devices'] = devices
+        cache['last_update'] = time.time()
+        return jsonify(devices)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Démarrage de l'auto-updater dans un thread séparé
     updater = AutoUpdater()
     updater_thread = threading.Thread(target=updater.start, daemon=True)
     updater_thread.start()
-    
+
     # Démarrage du thread de mise à jour du cache
     cache_thread = threading.Thread(target=update_cache, daemon=True)
     cache_thread.start()
-    
-    # Démarrage de l'application Flask
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+    # Démarrage du serveur Flask
+    app.run(host='0.0.0.0', port=5000)
