@@ -12,6 +12,7 @@ import sys
 import signal
 import psutil
 import socket
+import subprocess
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -45,31 +46,37 @@ def get_db():
 
 def init_db():
     """Initialise la base de données"""
-    with get_db() as db:
-        db.executescript('''
-            CREATE TABLE IF NOT EXISTS wans (
-                client_id TEXT PRIMARY KEY,
-                name TEXT,
-                ip TEXT,
-                subnet TEXT,
-                location TEXT,
-                hostname TEXT,
-                status TEXT DEFAULT 'offline',
-                last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
+    try:
+        with get_db() as db:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS wans (
+                    client_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    ip TEXT NOT NULL,
+                    subnet TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    hostname TEXT NOT NULL,
+                    status TEXT DEFAULT 'offline',
+                    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
             
-            CREATE TABLE IF NOT EXISTS devices (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                wan_id TEXT,
-                ip TEXT,
-                hostname TEXT,
-                mac TEXT,
-                vendor TEXT,
-                status TEXT,
-                last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (wan_id) REFERENCES wans (client_id)
-            );
-        ''')
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS devices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wan_id TEXT NOT NULL,
+                    mac TEXT NOT NULL,
+                    ip TEXT NOT NULL,
+                    hostname TEXT,
+                    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (wan_id) REFERENCES wans (client_id)
+                )
+            ''')
+            db.commit()
+            logger.info("Base de données initialisée avec succès")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'initialisation de la base de données: {str(e)}")
+        raise
 
 def get_server_ip():
     """Récupère l'IP du serveur"""
@@ -281,8 +288,8 @@ def restart_server():
     logging.info("Redémarrage du serveur...")
     if kill_process_on_port(5000):
         logging.info("Ancien processus terminé, redémarrage...")
-        python = sys.executable
-        os.execl(python, python, *sys.argv)
+        subprocess.Popen([sys.executable, __file__])
+        sys.exit(0)
     else:
         logging.error("Impossible de tuer l'ancien processus")
 
@@ -334,8 +341,9 @@ if __name__ == '__main__':
     status_thread.start()
     
     # Démarre le thread d'auto-update
-    update_thread = threading.Thread(target=check_for_updates, daemon=True)
+    update_thread = threading.Thread(target=check_for_updates)
+    update_thread.daemon = True
     update_thread.start()
     
     # Démarre l'application Flask
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=False)
