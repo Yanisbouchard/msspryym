@@ -159,25 +159,45 @@ def register_wan():
     """Enregistre un nouveau WAN"""
     try:
         data = request.json
+        if not data:
+            logger.error("Aucune donnée JSON reçue")
+            return jsonify({'error': 'Données JSON manquantes'}), 400
+
         required_fields = ['client_id', 'name', 'ip', 'subnet', 'location', 'hostname']
+        missing_fields = [field for field in required_fields if field not in data]
         
-        if not all(field in data for field in required_fields):
-            return jsonify({'error': 'Données manquantes'}), 400
+        if missing_fields:
+            logger.error(f"Champs manquants : {', '.join(missing_fields)}")
+            return jsonify({'error': f'Champs manquants : {", ".join(missing_fields)}'}), 400
             
-        with get_db() as db:
-            # Mise à jour du WAN avec le nouveau timestamp
-            db.execute('''
-                INSERT OR REPLACE INTO wans 
-                (client_id, name, ip, subnet, location, hostname, status, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?, 'online', datetime('now'))
-            ''', (data['client_id'], data['name'], data['ip'], 
-                  data['subnet'], data['location'], data['hostname']))
-            db.commit()
+        try:
+            with get_db() as db:
+                # Vérifie si le WAN existe déjà
+                existing = db.execute('SELECT client_id FROM wans WHERE client_id = ?', 
+                                   (data['client_id'],)).fetchone()
+                
+                if existing:
+                    logger.info(f"Mise à jour du WAN existant : {data['client_id']}")
+                else:
+                    logger.info(f"Création d'un nouveau WAN : {data['client_id']}")
+                
+                # Mise à jour ou insertion du WAN
+                db.execute('''
+                    INSERT OR REPLACE INTO wans 
+                    (client_id, name, ip, subnet, location, hostname, status, last_seen)
+                    VALUES (?, ?, ?, ?, ?, ?, 'online', datetime('now'))
+                ''', (data['client_id'], data['name'], data['ip'], 
+                      data['subnet'], data['location'], data['hostname']))
+                db.commit()
+                
+            return jsonify({'success': True})
+        except sqlite3.Error as e:
+            logger.error(f"Erreur SQLite lors de l'enregistrement du WAN: {str(e)}")
+            return jsonify({'error': 'Erreur de base de données'}), 500
             
-        return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Erreur lors de l'enregistrement du WAN: {str(e)}")
-        return jsonify({'error': 'Erreur serveur'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/devices/update', methods=['POST'])
 def update_devices():
