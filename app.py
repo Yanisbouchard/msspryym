@@ -250,6 +250,20 @@ def update_devices():
         logger.error(f"Erreur lors de la mise à jour des appareils: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+def get_devices(client_id):
+    """Récupère les appareils d'un WAN"""
+    with get_db() as db:
+        devices = db.execute('''
+            SELECT * FROM devices 
+            WHERE client_id = ?
+            ORDER BY ip
+        ''', (client_id,)).fetchall()
+        return [dict(device) for device in devices]
+
+@app.context_processor
+def utility_processor():
+    return dict(get_devices=get_devices)
+
 def update_wan_status():
     """Met à jour le statut des WANs"""
     while True:
