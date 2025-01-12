@@ -213,37 +213,40 @@ def register_wan():
 def update_devices():
     """Met à jour les appareils d'un WAN"""
     try:
-        data = request.json
-        if not data or 'client_id' not in data:
-            return jsonify({'error': 'Données manquantes'}), 400
+        data = request.get_json()
+        client_id = data.get('client_id')
+        devices = data.get('devices', [])
+        network_stats = data.get('network_stats', {})
+        
+        if not client_id:
+            return jsonify({'error': 'client_id manquant'}), 400
             
         with get_db() as db:
             # Met à jour les statistiques du WAN
-            if 'network_stats' in data:
-                stats = data['network_stats']
-                db.execute('''
-                    UPDATE wans 
-                    SET latency = ?, cpu_load = ?, last_seen = datetime('now')
-                    WHERE client_id = ?
-                ''', (stats.get('latency'), stats.get('cpu_load'), data['client_id']))
+            db.execute('''
+                UPDATE wans 
+                SET latency = ?, cpu_load = ?, last_seen = CURRENT_TIMESTAMP
+                WHERE client_id = ?
+            ''', (network_stats.get('latency'), network_stats.get('cpu_load'), client_id))
             
             # Supprime les anciens appareils
-            db.execute('DELETE FROM devices WHERE wan_id = ?', (data['client_id'],))
+            db.execute('DELETE FROM devices WHERE wan_id = ?', (client_id,))
             
             # Ajoute les nouveaux appareils
-            for device in data.get('devices', []):
+            for device in devices:
                 db.execute('''
                     INSERT INTO devices (wan_id, mac, ip, hostname, open_ports)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (
-                    data['client_id'],
-                    device['mac'],
-                    device['ip'],
-                    device['hostname'],
+                    client_id,
+                    device.get('mac'),
+                    device.get('ip'),
+                    device.get('hostname'),
                     json.dumps(device.get('open_ports', []))
                 ))
             
             db.commit()
+            logger.info(f"Appareils mis à jour pour le WAN {client_id}")
             return jsonify({'success': True})
             
     except Exception as e:
