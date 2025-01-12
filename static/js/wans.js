@@ -35,6 +35,10 @@ class WANManager {
             const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
             deleteModal.hide();
         });
+
+        // Mise à jour de la commande quand on tape
+        document.getElementById('wanName').addEventListener('input', updateCommand);
+        document.getElementById('wanLocation').addEventListener('input', updateCommand);
     }
 
     async deleteWAN(wanId) {
@@ -108,10 +112,106 @@ class WANManager {
         setInterval(() => {
             this.refreshWANs();
         }, this.refreshInterval);
+        
+        // Actualisation automatique des statuts
+        setInterval(() => {
+            document.querySelectorAll('[id^="status-"]').forEach(statusBadge => {
+                const clientId = statusBadge.id.replace('status-', '');
+                fetch(`/api/wans/${clientId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Met à jour le badge de statut
+                        statusBadge.className = `badge ${data.status === 'online' ? 'bg-success' : 'bg-danger'}`;
+                        statusBadge.textContent = data.status.toUpperCase();
+                        
+                        // Met à jour la latence
+                        const latencyBadge = document.getElementById(`latency-${clientId}`);
+                        if (latencyBadge) {
+                            const latency = data.latency;
+                            let color = 'gray';
+                            if (latency !== null) {
+                                if (latency <= 100) color = '#28a745';
+                                else if (latency <= 200) color = '#ffc107';
+                                else color = '#dc3545';
+                                latencyBadge.textContent = `${Math.round(latency)} ms`;
+                            } else {
+                                latencyBadge.textContent = 'N/A';
+                            }
+                            latencyBadge.style.backgroundColor = color;
+                        }
+                        
+                        // Met à jour la charge CPU
+                        const cpuBadge = document.getElementById(`cpu-${clientId}`);
+                        if (cpuBadge) {
+                            const cpu = data.cpu_load;
+                            let color = 'gray';
+                            if (cpu !== null) {
+                                if (cpu <= 40) color = '#28a745';
+                                else if (cpu <= 70) color = '#ffc107';
+                                else color = '#dc3545';
+                                cpuBadge.textContent = `${Math.round(cpu)}%`;
+                            } else {
+                                cpuBadge.textContent = 'N/A';
+                            }
+                            cpuBadge.style.backgroundColor = color;
+                        }
+                    })
+                    .catch(error => console.error('Erreur:', error));
+            });
+        }, 5000);
+    }
+}
+
+// Mise à jour de la commande de déploiement
+function updateCommand() {
+    const name = document.getElementById('wanName').value || '[nom]';
+    const location = document.getElementById('wanLocation').value || '[localisation]';
+    const command = `python seahawks_client.py --server http://${serverIP}:5000 --name "${name}" --location "${location}"`;
+    document.getElementById('deployCommand').textContent = command;
+}
+
+// Copie de la commande dans le presse-papier
+function copyCommand() {
+    const command = document.getElementById('deployCommand').textContent;
+    navigator.clipboard.writeText(command).then(() => {
+        alert('Commande copiée !');
+    });
+}
+
+// Rafraîchissement de la liste des appareils
+function refreshDevices(clientId) {
+    fetch(`/api/wans/${clientId}/devices`)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById(`devices-${clientId}`).innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+        });
+}
+
+// Suppression d'un WAN
+function deleteWAN(clientId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce WAN ?')) {
+        fetch(`/api/wans/${clientId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erreur lors de la suppression');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de la suppression');
+        });
     }
 }
 
 // Initialisation
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     new WANManager();
 });

@@ -54,10 +54,13 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">{{ wan.name }}</h5>
-                        <div>
-                            <span id="status-{{ wan.client_id }}" class="badge {% if wan.status == 'online' %}bg-success{% else %}bg-danger{% endif %}">
+                        <div class="d-flex align-items-center">
+                            <span id="status-{{ wan.client_id }}" class="badge {% if wan.status == 'online' %}bg-success{% else %}bg-danger{% endif %} me-2">
                                 {{ wan.status|upper }}
                             </span>
+                            <button class="btn btn-sm btn-danger" onclick="deleteWAN('{{ wan.client_id }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="card-body">
@@ -88,17 +91,24 @@
                         </div>
 
                         <div class="mt-3">
-                            <h6>Appareils connectés <button class="btn btn-sm btn-outline-primary" onclick="refreshDevices('{{ wan.client_id }}')">Actualiser</button></h6>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Appareils connectés</h6>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="refreshDevices('{{ wan.client_id }}')">
+                                        <i class="fas fa-sync-alt"></i> Actualiser
+                                    </button>
+                                </div>
+                            </div>
                             <div id="devices-{{ wan.client_id }}">
                                 {% with devices = get_devices(wan.client_id) %}
                                 <div class="table-responsive">
-                                    <table class="table table-sm">
+                                    <table class="table table-sm table-hover">
                                         <thead>
                                             <tr>
                                                 <th>IP</th>
                                                 <th>MAC</th>
                                                 <th>Hostname</th>
-                                                <th>Ports ouverts</th>
+                                                <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -110,9 +120,21 @@
                                                 <td>
                                                     {% if device.open_ports %}
                                                         {% set ports = device.open_ports|tojson|safe|from_json %}
-                                                        {% for port in ports %}
-                                                            {{ port.port }} ({{ port.service }})<br>
-                                                        {% endfor %}
+                                                        <button class="btn btn-sm btn-info" type="button" 
+                                                                data-bs-toggle="collapse" 
+                                                                data-bs-target="#ports-{{ wan.client_id }}-{{ loop.index }}" 
+                                                                aria-expanded="false">
+                                                            <i class="fas fa-network-wired"></i> Ports
+                                                        </button>
+                                                        <div class="collapse mt-2" id="ports-{{ wan.client_id }}-{{ loop.index }}">
+                                                            <div class="card card-body py-2 px-3">
+                                                                {% for port in ports %}
+                                                                    <small>{{ port.port }} ({{ port.service }})</small>
+                                                                {% endfor %}
+                                                            </div>
+                                                        </div>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">Aucun port</span>
                                                     {% endif %}
                                                 </td>
                                             </tr>
