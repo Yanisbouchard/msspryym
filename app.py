@@ -238,13 +238,33 @@ def kill_process_on_port(port):
             for conn in proc.connections():
                 if conn.laddr.port == port:
                     logging.info(f"Processus trouvé sur le port {port}: {proc.pid}")
-                    # Tue le processus
-                    os.kill(proc.pid, signal.SIGTERM)
-                    time.sleep(1)  # Attend que le processus se termine
-                    return True
+                    try:
+                        # Tue le processus avec SIGTERM
+                        os.kill(proc.pid, signal.SIGTERM)
+                        # Attend que le processus se termine
+                        time.sleep(2)
+                        # Vérifie si le processus est toujours en vie
+                        if psutil.pid_exists(proc.pid):
+                            # Force la fermeture avec SIGKILL si nécessaire
+                            logging.info(f"Le processus {proc.pid} ne répond pas, utilisation de SIGKILL")
+                            os.kill(proc.pid, signal.SIGKILL)
+                        return True
+                    except Exception as e:
+                        logging.error(f"Erreur lors de la tentative de kill du processus {proc.pid}: {str(e)}")
+                        return False
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
     return False
+
+def restart_server():
+    """Redémarre le serveur Flask"""
+    logging.info("Redémarrage du serveur...")
+    if kill_process_on_port(5000):
+        logging.info("Ancien processus terminé, redémarrage...")
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
+    else:
+        logging.error("Impossible de tuer l'ancien processus")
 
 def check_for_updates():
     """Vérifie les mises à jour GitHub toutes les 5 minutes"""
@@ -267,14 +287,8 @@ def check_for_updates():
                     repo.remotes.origin.pull()
                     logging.info("Modifications téléchargées avec succès")
                     
-                    # Tue le processus sur le port 5000
-                    logging.info("Arrêt du serveur actuel...")
-                    kill_process_on_port(5000)
-                    
-                    # Redémarre l'application
-                    logging.info("Redémarrage de l'application...")
-                    python = sys.executable
-                    os.execl(python, python, *sys.argv)
+                    # Redémarre le serveur
+                    restart_server()
                 else:
                     logging.info("Aucune nouvelle modification")
                     
