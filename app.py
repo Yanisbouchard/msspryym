@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
+import git
+import sys
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -213,6 +215,41 @@ def update_wan_status():
             logger.error(f"Erreur lors de la mise à jour des statuts: {str(e)}")
         time.sleep(5)  # Vérification toutes les 5 secondes
 
+def check_for_updates():
+    """Vérifie les mises à jour GitHub toutes les 5 minutes"""
+    try:
+        repo = git.Repo('.')
+        while True:
+            try:
+                # Fetch les dernières modifications
+                repo.remotes.origin.fetch()
+                
+                # Récupère le dernier commit distant
+                remote_commit = repo.refs['origin/main'].commit.hexsha
+                current_commit = repo.head.commit.hexsha
+                
+                # Compare avec le commit local
+                if remote_commit != current_commit:
+                    logging.info("Nouvelles modifications détectées!")
+                    
+                    # Pull les changements
+                    repo.remotes.origin.pull()
+                    logging.info("Modifications téléchargées avec succès")
+                    
+                    # Redémarre l'application
+                    logging.info("Redémarrage de l'application...")
+                    os.execv(sys.executable, ['python'] + sys.argv)
+                else:
+                    logging.info("Aucune nouvelle modification")
+                    
+            except Exception as e:
+                logging.error(f"Erreur lors de la vérification des mises à jour: {str(e)}")
+                
+            time.sleep(300)  # Attend 5 minutes
+            
+    except Exception as e:
+        logging.error(f"Erreur dans la boucle d'auto-update: {str(e)}")
+
 @app.context_processor
 def inject_version():
     """Injecte la version dans tous les templates"""
@@ -222,9 +259,13 @@ if __name__ == '__main__':
     # Initialisation
     init_db()
     
-    # Démarrage du thread de mise à jour des statuts
+    # Démarre le thread de mise à jour des statuts
     status_thread = threading.Thread(target=update_wan_status, daemon=True)
     status_thread.start()
     
-    # Démarrage du serveur
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Démarre le thread d'auto-update
+    update_thread = threading.Thread(target=check_for_updates, daemon=True)
+    update_thread.start()
+    
+    # Démarre l'application Flask
+    app.run(host='0.0.0.0', port=5000)
