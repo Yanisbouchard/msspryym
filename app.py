@@ -15,7 +15,7 @@ import signal
 load_dotenv()
 
 # Configuration
-VERSION = '3.1.1'
+VERSION = '3.2.0'
 DATABASE_PATH = os.getenv('DATABASE_PATH', 'wans.db')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 LOG_FILE = os.getenv('LOG_FILE', 'seahawks.log')

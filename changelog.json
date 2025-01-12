@@ -1,6 +1,17 @@
 {
-    "current_version": "3.1.1",
+    "current_version": "3.2.0",
     "versions": [
+        {
+            "version": "3.2.0",
+            "type": "minor",
+            "date": "2025-01-12",
+            "changes": [
+                "Ajout de l'auto-update depuis GitHub",
+                "Amélioration du redémarrage automatique du serveur",
+                "Correction de l'enregistrement des WANs avec hostname",
+                "Amélioration des messages d'erreur côté client"
+            ]
+        },
         {
             "version": "3.1.1",
             "type": "patch",
