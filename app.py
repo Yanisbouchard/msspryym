@@ -156,13 +156,16 @@ def delete_wan(client_id):
     """Supprime un WAN"""
     try:
         with get_db() as db:
+            # Supprime d'abord les appareils associés
             db.execute('DELETE FROM devices WHERE wan_id = ?', (client_id,))
+            # Puis supprime le WAN
             db.execute('DELETE FROM wans WHERE client_id = ?', (client_id,))
             db.commit()
+            logger.info(f"WAN supprimé avec succès : {client_id}")
             return jsonify({'success': True})
     except Exception as e:
-        logger.error(f"Erreur lors de la suppression du WAN: {str(e)}")
-        return jsonify({'error': 'Erreur serveur'}), 500
+        logger.error(f"Erreur lors de la suppression du WAN : {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/register', methods=['POST'])
 def register_wan():
@@ -357,6 +360,14 @@ def check_for_updates():
 def inject_version():
     """Injecte la version dans tous les templates"""
     return {'version': VERSION}
+
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Convertit une chaîne JSON en objet Python"""
+    try:
+        return json.loads(value)
+    except:
+        return []
 
 if __name__ == '__main__':
     # Initialisation

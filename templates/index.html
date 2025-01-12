@@ -96,8 +96,8 @@
                                         <thead>
                                             <tr>
                                                 <th>IP</th>
-                                                <th>Hostname</th>
                                                 <th>MAC</th>
+                                                <th>Hostname</th>
                                                 <th>Ports ouverts</th>
                                             </tr>
                                         </thead>
@@ -105,16 +105,14 @@
                                             {% for device in devices %}
                                             <tr>
                                                 <td>{{ device.ip }}</td>
-                                                <td>{{ device.hostname }}</td>
                                                 <td>{{ device.mac }}</td>
+                                                <td>{{ device.hostname }}</td>
                                                 <td>
                                                     {% if device.open_ports %}
-                                                        {% set ports = device.open_ports|from_json %}
+                                                        {% set ports = device.open_ports|tojson|safe|from_json %}
                                                         {% for port in ports %}
-                                                            <span class="badge bg-info">{{ port.port }}/{{ port.service }}</span>
+                                                            {{ port.port }} ({{ port.service }})<br>
                                                         {% endfor %}
-                                                    {% else %}
-                                                        <span class="text-muted">Aucun port ouvert</span>
                                                     {% endif %}
                                                 </td>
                                             </tr>
