@@ -45,26 +45,90 @@
         </div>
     </nav>
 
-    <div class="container-fluid mt-4">
-        <!-- Section WANs -->
-        <div class="row mb-4">
-            <div class="col-12">
+    <div class="container mt-4">
+        <h1>Tableau de bord</h1>
+        
+        <div class="row mt-4">
+            {% for wan in wans %}
+            <div class="col-md-6 mb-4">
                 <div class="card">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ wan.name }}</h5>
                         <div>
-                            <i class="fas fa-globe"></i> WANs Deployes
-                        </div>
-                        <div>
-                            <button class="btn btn-sm btn-light" id="refreshWANs">
-                                <i class="fas fa-sync-alt"></i> Actualiser
-                            </button>
+                            <span id="status-{{ wan.client_id }}" class="badge {% if wan.status == 'online' %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ wan.status|upper }}
+                            </span>
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="row" id="wans-container"></div>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <strong>Location:</strong> {{ wan.location }}
+                            </div>
+                            <div class="col">
+                                <strong>IP:</strong> {{ wan.ip }}
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col">
+                                <strong>Latence:</strong>
+                                <span id="latency-{{ wan.client_id }}" class="badge" 
+                                      style="background-color: {% if wan.latency is none %}gray{% elif wan.latency <= 100 %}#28a745{% elif wan.latency <= 200 %}#ffc107{% else %}#dc3545{% endif %}">
+                                    {{ wan.latency|round|int if wan.latency else 'N/A' }} ms
+                                </span>
+                            </div>
+                            <div class="col">
+                                <strong>CPU:</strong>
+                                <span id="cpu-{{ wan.client_id }}" class="badge"
+                                      style="background-color: {% if wan.cpu_load is none %}gray{% elif wan.cpu_load <= 40 %}#28a745{% elif wan.cpu_load <= 70 %}#ffc107{% else %}#dc3545{% endif %}">
+                                    {{ wan.cpu_load|round|int if wan.cpu_load else 'N/A' }}%
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <h6>Appareils connectés <button class="btn btn-sm btn-outline-primary" onclick="refreshDevices('{{ wan.client_id }}')">Actualiser</button></h6>
+                            <div id="devices-{{ wan.client_id }}">
+                                {% with devices = get_devices(wan.client_id) %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>IP</th>
+                                                <th>Hostname</th>
+                                                <th>MAC</th>
+                                                <th>Ports ouverts</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for device in devices %}
+                                            <tr>
+                                                <td>{{ device.ip }}</td>
+                                                <td>{{ device.hostname }}</td>
+                                                <td>{{ device.mac }}</td>
+                                                <td>
+                                                    {% if device.open_ports %}
+                                                        {% set ports = device.open_ports|from_json %}
+                                                        {% for port in ports %}
+                                                            <span class="badge bg-info">{{ port.port }}/{{ port.service }}</span>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <span class="text-muted">Aucun port ouvert</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endwith %}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            {% endfor %}
         </div>
     </div>
 
@@ -147,6 +211,65 @@
                 alert('Commande copiee dans le presse-papier !');
             });
         }
+    </script>
+
+    <script>
+        function refreshDevices(clientId) {
+            fetch(`/api/wans/${clientId}/devices`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.devices) {
+                        const devicesList = document.getElementById(`devices-${clientId}`);
+                        // Mettre à jour le contenu avec les nouveaux appareils
+                        // TODO: Implémenter l'affichage des appareils
+                    }
+                })
+                .catch(error => console.error('Erreur:', error));
+        }
+
+        // Actualisation automatique des statuts
+        setInterval(() => {
+            {% for wan in wans %}
+            fetch(`/api/wans/{{ wan.client_id }}`)
+                .then(response => response.json())
+                .then(data => {
+                    const statusBadge = document.getElementById(`status-{{ wan.client_id }}`);
+                    const latencyBadge = document.getElementById(`latency-{{ wan.client_id }}`);
+                    const cpuBadge = document.getElementById(`cpu-{{ wan.client_id }}`);
+                    
+                    // Mise à jour du statut
+                    if (data.status) {
+                        statusBadge.textContent = data.status.toUpperCase();
+                        statusBadge.className = `badge ${data.status === 'online' ? 'bg-success' : 'bg-danger'}`;
+                    }
+                    
+                    // Mise à jour de la latence
+                    if (data.latency !== undefined) {
+                        const latency = Math.round(data.latency);
+                        let color = 'gray';
+                        if (latency <= 100) color = '#28a745';
+                        else if (latency <= 200) color = '#ffc107';
+                        else color = '#dc3545';
+                        
+                        latencyBadge.textContent = `${latency} ms`;
+                        latencyBadge.style.backgroundColor = color;
+                    }
+                    
+                    // Mise à jour du CPU
+                    if (data.cpu_load !== undefined) {
+                        const cpuLoad = Math.round(data.cpu_load);
+                        let color = 'gray';
+                        if (cpuLoad <= 40) color = '#28a745';
+                        else if (cpuLoad <= 70) color = '#ffc107';
+                        else color = '#dc3545';
+                        
+                        cpuBadge.textContent = `${cpuLoad}%`;
+                        cpuBadge.style.backgroundColor = color;
+                    }
+                })
+                .catch(error => console.error('Erreur:', error));
+            {% endfor %}
+        }, 5000);  // Actualisation toutes les 5 secondes
     </script>
 </body>
 </html>

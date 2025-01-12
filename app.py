@@ -57,7 +57,9 @@ def init_db():
                     location TEXT NOT NULL,
                     hostname TEXT NOT NULL,
                     status TEXT DEFAULT 'offline',
-                    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    latency REAL,
+                    cpu_load REAL
                 )
             ''')
             
@@ -69,6 +71,7 @@ def init_db():
                     ip TEXT NOT NULL,
                     hostname TEXT,
                     last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    open_ports TEXT,
                     FOREIGN KEY (wan_id) REFERENCES wans (client_id)
                 )
             ''')
@@ -211,35 +214,41 @@ def update_devices():
     """Met à jour les appareils d'un WAN"""
     try:
         data = request.json
-        if not data or 'wan_id' not in data or 'devices' not in data:
+        if not data or 'client_id' not in data:
             return jsonify({'error': 'Données manquantes'}), 400
             
         with get_db() as db:
-            # Mise à jour du WAN
-            db.execute('''
-                UPDATE wans 
-                SET status = 'online', last_seen = datetime('now')
-                WHERE client_id = ?
-            ''', (data['wan_id'],))
-            
-            # Supprimer les anciens appareils
-            db.execute('DELETE FROM devices WHERE wan_id = ?', (data['wan_id'],))
-            
-            # Ajouter les nouveaux appareils
-            for device in data['devices']:
+            # Met à jour les statistiques du WAN
+            if 'network_stats' in data:
+                stats = data['network_stats']
                 db.execute('''
-                    INSERT INTO devices 
-                    (wan_id, ip, hostname, mac, vendor, status, last_seen)
-                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-                ''', (data['wan_id'], device['ip'], device.get('hostname', 'Unknown'), 
-                      device.get('mac', 'Unknown'), device.get('vendor', 'Unknown'), 
-                      device.get('status', 'unknown')))
-            db.commit()
+                    UPDATE wans 
+                    SET latency = ?, cpu_load = ?, last_seen = datetime('now')
+                    WHERE client_id = ?
+                ''', (stats.get('latency'), stats.get('cpu_load'), data['client_id']))
             
-        return jsonify({'success': True})
+            # Supprime les anciens appareils
+            db.execute('DELETE FROM devices WHERE wan_id = ?', (data['client_id'],))
+            
+            # Ajoute les nouveaux appareils
+            for device in data.get('devices', []):
+                db.execute('''
+                    INSERT INTO devices (wan_id, mac, ip, hostname, open_ports)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    data['client_id'],
+                    device['mac'],
+                    device['ip'],
+                    device['hostname'],
+                    json.dumps(device.get('open_ports', []))
+                ))
+            
+            db.commit()
+            return jsonify({'success': True})
+            
     except Exception as e:
         logger.error(f"Erreur lors de la mise à jour des appareils: {str(e)}")
-        return jsonify({'error': 'Erreur serveur'}), 500
+        return jsonify({'error': str(e)}), 500
 
 def update_wan_status():
     """Met à jour le statut des WANs"""
