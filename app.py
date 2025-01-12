@@ -255,7 +255,7 @@ def get_devices(client_id):
     with get_db() as db:
         devices = db.execute('''
             SELECT * FROM devices 
-            WHERE client_id = ?
+            WHERE wan_id = ?
             ORDER BY ip
         ''', (client_id,)).fetchall()
         return [dict(device) for device in devices]
