@@ -9,6 +9,7 @@ from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
 import git
 import sys
+import signal
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -237,9 +238,10 @@ def check_for_updates():
                     repo.remotes.origin.pull()
                     logging.info("Modifications téléchargées avec succès")
                     
-                    # Redémarre l'application
+                    # Redémarre l'application en tuant le processus actuel
                     logging.info("Redémarrage de l'application...")
-                    os.execv(sys.executable, ['python'] + sys.argv)
+                    pid = os.getpid()
+                    os.kill(pid, signal.SIGTERM)
                 else:
                     logging.info("Aucune nouvelle modification")
                     
