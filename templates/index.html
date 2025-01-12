@@ -118,23 +118,19 @@
                                                 <td>{{ device.mac }}</td>
                                                 <td>{{ device.hostname }}</td>
                                                 <td>
+                                                    <button class="btn btn-info" type="button" 
+                                                            data-bs-toggle="collapse" 
+                                                            data-bs-target="#ports-{{ wan.client_id }}-{{ loop.index }}" 
+                                                            aria-expanded="false">
+                                                        Ports
+                                                    </button>
                                                     {% if device.open_ports %}
+                                                    <div class="collapse" id="ports-{{ wan.client_id }}-{{ loop.index }}">
                                                         {% set ports = device.open_ports|tojson|safe|from_json %}
-                                                        <button class="btn btn-sm btn-info" type="button" 
-                                                                data-bs-toggle="collapse" 
-                                                                data-bs-target="#ports-{{ wan.client_id }}-{{ loop.index }}" 
-                                                                aria-expanded="false">
-                                                            <i class="fas fa-network-wired"></i> Ports
-                                                        </button>
-                                                        <div class="collapse mt-2" id="ports-{{ wan.client_id }}-{{ loop.index }}">
-                                                            <div class="card card-body py-2 px-3">
-                                                                {% for port in ports %}
-                                                                    <small>{{ port.port }} ({{ port.service }})</small>
-                                                                {% endfor %}
-                                                            </div>
-                                                        </div>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Aucun port</span>
+                                                        {% for port in ports %}
+                                                            <div>{{ port.port }} ({{ port.service }})</div>
+                                                        {% endfor %}
+                                                    </div>
                                                     {% endif %}
                                                 </td>
                                             </tr>
