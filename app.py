@@ -11,6 +11,7 @@ import git
 import sys
 import signal
 import psutil
+import socket
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -70,13 +71,24 @@ def init_db():
             );
         ''')
 
+def get_server_ip():
+    """Récupère l'IP du serveur"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return 'localhost'
+
 # Routes principales
 @app.route('/')
 def index():
     """Page d'accueil"""
     with get_db() as db:
         wans = db.execute('SELECT * FROM wans').fetchall()
-        return render_template('index.html', wans=wans)
+        return render_template('index.html', wans=wans, server_ip=get_server_ip())
 
 @app.route('/changelog')
 def changelog():
