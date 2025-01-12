@@ -237,6 +237,12 @@ def update_devices():
             
             # Ajoute les nouveaux appareils
             for device in devices:
+                open_ports = device.get('open_ports', [])
+                if isinstance(open_ports, list):
+                    open_ports_json = json.dumps(open_ports)
+                else:
+                    open_ports_json = '[]'
+                    
                 db.execute('''
                     INSERT INTO devices (wan_id, mac, ip, hostname, open_ports)
                     VALUES (?, ?, ?, ?, ?)
@@ -245,7 +251,7 @@ def update_devices():
                     device.get('mac'),
                     device.get('ip'),
                     device.get('hostname'),
-                    json.dumps(device.get('open_ports', []))
+                    open_ports_json
                 ))
             
             db.commit()
