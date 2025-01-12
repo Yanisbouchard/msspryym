@@ -50,6 +50,7 @@ def init_db():
                 ip TEXT,
                 subnet TEXT,
                 location TEXT,
+                hostname TEXT,
                 status TEXT DEFAULT 'offline',
                 last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -144,7 +145,7 @@ def register_wan():
     """Enregistre un nouveau WAN"""
     try:
         data = request.json
-        required_fields = ['client_id', 'name', 'ip', 'subnet', 'location']
+        required_fields = ['client_id', 'name', 'ip', 'subnet', 'location', 'hostname']
         
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Données manquantes'}), 400
@@ -153,10 +154,10 @@ def register_wan():
             # Mise à jour du WAN avec le nouveau timestamp
             db.execute('''
                 INSERT OR REPLACE INTO wans 
-                (client_id, name, ip, subnet, location, status, last_seen)
-                VALUES (?, ?, ?, ?, ?, 'online', datetime('now'))
+                (client_id, name, ip, subnet, location, hostname, status, last_seen)
+                VALUES (?, ?, ?, ?, ?, ?, 'online', datetime('now'))
             ''', (data['client_id'], data['name'], data['ip'], 
-                  data['subnet'], data['location']))
+                  data['subnet'], data['location'], data['hostname']))
             db.commit()
             
         return jsonify({'success': True})

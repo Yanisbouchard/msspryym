@@ -71,16 +71,25 @@ class NetworkMonitor:
         """Enregistre le client auprès du serveur"""
         try:
             data = {
-                'client_id': self.client_id,
-                'name': self.hostname,
-                'ip': self.ip,
-                'subnet': self.subnet,
-                'location': self.location
+                "client_id": self.client_id,
+                "name": self.hostname,
+                "location": self.location,
+                "hostname": self.hostname,
+                "ip": self.ip,
+                "subnet": self.subnet
             }
+            print(f"Tentative d'enregistrement avec les données : {json.dumps(data, indent=2)}")
+            
             response = requests.post(f"{self.server_url}/api/register", json=data)
-            return response.status_code == 200
+            if response.status_code == 200:
+                print("Enregistrement réussi")
+                return True
+            else:
+                print(f"Erreur lors de l'enregistrement : {response.status_code}")
+                print(f"Réponse : {response.text}")
+                return False
         except Exception as e:
-            print(f"Erreur lors de l'enregistrement: {str(e)}")
+            print(f"Erreur lors de l'enregistrement : {str(e)}")
             return False
 
     def update_devices(self):
