@@ -64,28 +64,19 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col">
-                                <strong>Location:</strong> {{ wan.location }}
-                            </div>
-                            <div class="col">
-                                <strong>IP:</strong> {{ wan.ip }}
-                            </div>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col">
+                        <p><strong>Location:</strong> {{ wan.location }}</p>
+                        <p><strong>IP:</strong> {{ wan.ip }}</p>
+                        <div class="d-flex gap-3">
+                            <div>
                                 <strong>Latence:</strong>
-                                <span id="latency-{{ wan.client_id }}" class="badge" 
-                                      style="background-color: {% if wan.latency is none %}gray{% elif wan.latency <= 100 %}#28a745{% elif wan.latency <= 200 %}#ffc107{% else %}#dc3545{% endif %}">
-                                    {{ wan.latency|round|int if wan.latency else 'N/A' }} ms
+                                <span id="latency-{{ wan.client_id }}" class="badge" style="background-color: {% if wan.latency <= 100 %}#28a745{% elif wan.latency <= 200 %}#ffc107{% else %}#dc3545{% endif %}">
+                                    {% if wan.latency %}{{ wan.latency|round|int }} ms{% else %}N/A{% endif %}
                                 </span>
                             </div>
-                            <div class="col">
+                            <div>
                                 <strong>CPU:</strong>
-                                <span id="cpu-{{ wan.client_id }}" class="badge"
-                                      style="background-color: {% if wan.cpu_load is none %}gray{% elif wan.cpu_load <= 40 %}#28a745{% elif wan.cpu_load <= 70 %}#ffc107{% else %}#dc3545{% endif %}">
-                                    {{ wan.cpu_load|round|int if wan.cpu_load else 'N/A' }}%
+                                <span id="cpu-{{ wan.client_id }}" class="badge" style="background-color: {% if wan.cpu_load <= 40 %}#28a745{% elif wan.cpu_load <= 70 %}#ffc107{% else %}#dc3545{% endif %}">
+                                    {% if wan.cpu_load %}{{ wan.cpu_load|round|int }}%{% else %}N/A{% endif %}
                                 </span>
                             </div>
                         </div>
