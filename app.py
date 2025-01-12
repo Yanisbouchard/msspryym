@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import git
 import sys
 import signal
+import psutil
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -217,6 +218,22 @@ def update_wan_status():
             logger.error(f"Erreur lors de la mise à jour des statuts: {str(e)}")
         time.sleep(5)  # Vérification toutes les 5 secondes
 
+def kill_process_on_port(port):
+    """Tue le processus qui utilise un port spécifique"""
+    for proc in psutil.process_iter(['pid', 'name', 'connections']):
+        try:
+            # Vérifie les connexions de chaque processus
+            for conn in proc.connections():
+                if conn.laddr.port == port:
+                    logging.info(f"Processus trouvé sur le port {port}: {proc.pid}")
+                    # Tue le processus
+                    os.kill(proc.pid, signal.SIGTERM)
+                    time.sleep(1)  # Attend que le processus se termine
+                    return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    return False
+
 def check_for_updates():
     """Vérifie les mises à jour GitHub toutes les 5 minutes"""
     try:
@@ -238,10 +255,14 @@ def check_for_updates():
                     repo.remotes.origin.pull()
                     logging.info("Modifications téléchargées avec succès")
                     
-                    # Redémarre l'application en tuant le processus actuel
+                    # Tue le processus sur le port 5000
+                    logging.info("Arrêt du serveur actuel...")
+                    kill_process_on_port(5000)
+                    
+                    # Redémarre l'application
                     logging.info("Redémarrage de l'application...")
-                    pid = os.getpid()
-                    os.kill(pid, signal.SIGTERM)
+                    python = sys.executable
+                    os.execl(python, python, *sys.argv)
                 else:
                     logging.info("Aucune nouvelle modification")
                     
